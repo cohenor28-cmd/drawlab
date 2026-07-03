@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#082019" />
+<meta name="mobile-web-app-capable" content="yes" />
+<link rel="manifest" href="/manifest.json" />
+<link rel="apple-touch-icon" href="/icons/icon-192.png" />
+<title>מעבדת התיקו</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;900&family=Assistant:wght@400;600;700&display=swap');
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{font-family:'Assistant',system-ui,sans-serif;background:#082019;color:#e8f0ea;margin:0;
+    line-height:1.6;-webkit-font-smoothing:antialiased;}
+  #app{max-width:920px;margin:0 auto;padding:20px 14px calc(60px + env(safe-area-inset-bottom));}
+  .accent{color:#f2b705;}
+  .hero{text-align:center;padding:24px 6px 28px;}
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:#8fa99b;
+    border:1px solid #1f4a3a;border-radius:20px;padding:5px 12px;margin-bottom:16px;}
+  h1{font-family:'Rubik';font-weight:900;font-size:clamp(36px,10vw,60px);line-height:.95;margin:0 0 12px;letter-spacing:-1px;}
+  .sub{max-width:560px;margin:0 auto;color:#a8c0b3;font-size:15px;}
+  .card{background:#0b271e;border:1px solid #143529;border-radius:16px;padding:20px;margin:14px 0;}
+  .chead{display:flex;align-items:baseline;gap:12px;margin-bottom:16px;}
+  .chead h2{font-family:'Rubik';font-weight:700;font-size:19px;margin:0;}
+  .num{font-family:'Rubik';font-weight:900;font-size:14px;color:#f2b705;border:1px solid #2a5a46;
+    border-radius:7px;padding:3px 8px;letter-spacing:1px;}
+  .drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+    border:1.5px dashed #2a5a46;border-radius:14px;padding:26px 18px;text-align:center;background:#0d2e23;cursor:pointer;}
+  .drop:active{background:#10362a;}
+  .drop svg{color:#f2b705;}
+  .up-t{font-weight:700;font-size:16px;}
+  .up-s{font-size:12.5px;color:#8fa99b;}
+  .pick{background:#f2b705;border:none;border-radius:10px;padding:13px 28px;font-weight:800;font-size:15px;
+    color:#082019;margin-top:6px;font-family:inherit;}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;}
+  .btn{display:inline-flex;align-items:center;gap:7px;background:#0d2e23;border:1px solid #2a5a46;color:#e8f0ea;
+    border-radius:9px;padding:11px 16px;cursor:pointer;font-family:inherit;font-weight:700;font-size:14px;}
+  .btn:active{border-color:#f2b705;}
+  .btn.primary{background:#123a2d;border-color:#3dd68c55;}
+  .btn:disabled{opacity:.6;}
+  .fmsg{display:flex;align-items:flex-start;gap:8px;border-radius:9px;padding:10px 13px;font-size:13.5px;margin-top:12px;}
+  .fmsg svg{flex:none;margin-top:2px;}
+  .fmsg.ok{background:#0d2e23;border:1px solid #3dd68c55;color:#c9f5e0;}
+  .fmsg.warn{background:#241608;border:1px solid #c98a2b55;color:#f0d5a8;}
+  .fmsg.err{background:#2a0f11;border:1px solid #e5484d55;color:#ffb4b4;}
+  .links{margin-top:16px;border-top:1px solid #143529;padding-top:14px;}
+  .links-h{font-size:12.5px;color:#8fa99b;font-weight:600;margin-bottom:10px;}
+  .links-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;}
+  .lnk{display:inline-flex;align-items:center;gap:6px;background:#0d2e23;border:1px solid #143529;border-radius:8px;
+    padding:10px 12px;font-size:13px;font-weight:600;color:#e8f0ea;text-decoration:none;}
+  .lnk:active{border-color:#f2b705;color:#f2b705;}
+  .links-n{font-size:11.5px;color:#7d968a;margin-top:10px;}
+  .loaded{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    margin-top:16px;border-top:1px solid #143529;padding-top:16px;}
+  .loaded strong{display:block;font-size:15px;}
+  .src{font-size:12px;color:#8fa99b;}
+  .ok-c{color:#3dd68c;}
+  .clear{display:inline-flex;align-items:center;gap:6px;background:none;border:1px solid #143529;color:#a8c0b3;
+    border-radius:8px;padding:8px 12px;cursor:pointer;font-family:inherit;font-size:13px;}
+  .clear:active{border-color:#e5484d;color:#e5484d;}
+  .verify{margin-top:16px;border-top:1px solid #143529;padding-top:16px;}
+  .verify-h{font-size:13px;font-weight:700;color:#8fa99b;margin-bottom:10px;}
+  .vrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;background:#0d2e23;
+    border-radius:8px;padding:8px 12px;margin-bottom:6px;}
+  .vseason{font-family:'Rubik';font-weight:700;min-width:150px;}
+  .vg{color:#a8c0b3;flex:1;}
+  .vflag{font-weight:600;font-size:12px;}
+  .vflag.ok{color:#3dd68c;} .vflag.warn{color:#f2b705;}
+  .selects,.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;}
+  .field{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:#a8c0b3;}
+  .field select,.field input{background:#0d2e23;border:1px solid #2a5a46;color:#e8f0ea;border-radius:9px;
+    padding:11px 12px;font-family:inherit;font-size:15px;font-weight:600;}
+  .field select:focus,.field input:focus{outline:2px solid #f2b705;border-color:#f2b705;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:10px;margin-bottom:20px;}
+  .kpi{background:#0d2e23;border:1px solid #143529;border-radius:12px;padding:13px;text-align:center;}
+  .kpi.accent{border-color:#f2b70560;background:#1a180a;}
+  .kpi.warn{border-color:#e5484d40;}
+  .kpi-v{font-family:'Rubik';font-weight:900;font-size:24px;line-height:1;}
+  .kpi.accent .kpi-v{color:#f2b705;} .kpi.warn .kpi-v{color:#ff8a5c;}
+  .kpi-l{font-size:11.5px;color:#8fa99b;margin-top:6px;}
+  .ledger-h{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;
+    font-size:12.5px;color:#8fa99b;margin-bottom:10px;}
+  .ledger{display:flex;flex-wrap:wrap;gap:4px;}
+  .cell{width:15px;height:15px;border-radius:3px;display:inline-block;flex:none;}
+  .cell.nodraw{background:#123a2d;border:1px solid #1f4a3a;}
+  .cell.draw{background:#f2b705;}
+  .leg{display:inline-flex;align-items:center;gap:4px;}
+  .leg .cell{width:12px;height:12px;}
+  .chart-t{font-size:13px;color:#a8c0b3;font-weight:600;margin:18px 0 10px;}
+  .chart svg{width:100%;height:auto;display:block;}
+  .thresh{margin:20px 0 8px;}
+  .thresh-l{font-size:15px;margin-bottom:12px;}
+  .thresh-l strong{color:#f2b705;font-family:'Rubik';font-size:19px;}
+  .thresh-h{display:block;font-size:12.5px;color:#8fa99b;font-weight:400;margin-top:2px;}
+  input[type=range]{width:100%;accent-color:#f2b705;height:6px;}
+  .simkpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:20px 0;}
+  .simkpi{background:#0d2e23;border:1px solid #143529;border-radius:12px;padding:13px;text-align:center;}
+  .simkpi.big{grid-column:span 2;}
+  .simkpi-v{font-family:'Rubik';font-weight:900;font-size:22px;line-height:1;}
+  .simkpi.big .simkpi-v{font-size:30px;}
+  .simkpi-l{font-size:11.5px;color:#8fa99b;margin-top:6px;}
+  .simkpi.good .simkpi-v{color:#3dd68c;} .simkpi.warn .simkpi-v{color:#ff8a5c;}
+  .simkpi.danger .simkpi-v{color:#e5484d;} .simkpi.danger{border-color:#e5484d50;}
+  .alert{display:flex;align-items:flex-start;gap:8px;background:#2a0f11;border:1px solid #e5484d50;color:#ffb4b4;
+    border-radius:10px;padding:12px 14px;font-size:13.5px;margin:6px 0 16px;}
+  .alert svg{flex:none;margin-top:2px;color:#e5484d;}
+  .lead{color:#a8c0b3;font-size:14.5px;margin:0 0 16px;}
+  .best{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-radius:11px;padding:13px 16px;font-size:15px;margin-bottom:16px;}
+  .best.good{background:#0d2e23;border:1px solid #3dd68c50;color:#c9f5e0;}
+  .best.bad{background:#241608;border:1px solid #c98a2b50;color:#f0d5a8;}
+  .best strong{color:#f2b705;font-family:'Rubik';}
+  .best-w{color:#ff8a5c;font-size:13px;}
+  .sweep-leg{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:#8fa99b;margin-top:6px;}
+  .sweep-leg span{display:inline-flex;align-items:center;gap:6px;}
+  .sweep-leg i{width:12px;height:12px;border-radius:3px;display:inline-block;}
+  .reality{background:#0d2e23;border:1px solid #2a5a46;border-radius:16px;padding:20px;margin:14px 0;}
+  .reality-h{font-family:'Rubik';font-weight:700;font-size:16px;color:#f2b705;margin-bottom:10px;}
+  .reality p{margin:0 0 10px;color:#c4d6cb;font-size:14.5px;}
+  .reality strong{color:#e8f0ea;}
+  .install{font-size:13px;color:#a8c0b3;background:#0b271e;border:1px dashed #2a5a46;border-radius:10px;padding:12px 14px;margin-top:10px;}
+  .foot{text-align:center;font-size:12px;color:#5f7a6d;margin-top:24px;}
+  .hidden{display:none !important;}
+  .spin{animation:sp 1s linear infinite;} @keyframes sp{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="hero">
+    <div class="badge">🧪 כלי מחקר · לא ייעוץ הימורים</div>
+    <h1>מעבדת ה<span class="accent">תיקו</span></h1>
+    <p class="sub">מנתחת את היסטוריית התיקו של קבוצה, ובודקת בכנות אם שיטת ההכפלה היתה מרוויחה — על נתונים אמיתיים עם היחסים שהוצעו בפועל. הנתונים נשמרים במכשיר שלך.</p>
+  </header>
+
+  <!-- 01 נתונים -->
+  <section class="card">
+    <div class="chead"><span class="num">01</span><h2>נתונים</h2></div>
+    <label class="drop">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span class="up-t">בחר את קובצי ה־CSV מהטלפון</span>
+      <span class="up-s">פתח את תיקיית "הורדות" ובחר את הקבצים (אפשר כמה יחד)</span>
+      <span class="pick">פתח את הקבצים</span>
+      <input id="fileInput" type="file" accept="*/*" multiple hidden />
+    </label>
+    <div class="actions">
+      <button class="btn primary" id="autoBtn">☁️ נסה למשוך אוטומטית (6 הקבצים)</button>
+      <button class="btn" id="demoBtn">🧪 נתוני הדגמה</button>
+    </div>
+    <div id="fetchMsg"></div>
+    <div class="links">
+      <div class="links-h">⬇️ הורדה ידנית — לחיצה מורידה את הקובץ, ואז בחר אותם עם הכפתור למעלה</div>
+      <div class="links-g" id="linksGrid"></div>
+      <div class="links-n">המקור: football-data.co.uk · כל קובץ כולל תוצאות + יחסי תיקו אמיתיים מהבוקמייקרים.</div>
+    </div>
+    <div id="loadedInfo"></div>
+    <div id="verify"></div>
+  </section>
+
+  <!-- 02 בחירה -->
+  <section class="card hidden" id="selectSec">
+    <div class="chead"><span class="num">02</span><h2>בחירת ליגה, קבוצה ועונה</h2></div>
+    <div class="selects">
+      <label class="field"><span>ליגה</span><select id="leagueSel"></select></label>
+      <label class="field"><span>קבוצה</span><select id="teamSel"></select></label>
+      <label class="field"><span>עונה</span><select id="seasonSel"></select></label>
+    </div>
+  </section>
+
+  <!-- 03 סטטיסטיקה -->
+  <section class="card hidden" id="statsSec"></section>
+
+  <!-- 04 סימולטור -->
+  <section class="card hidden" id="simSec">
+    <div class="chead"><span class="num">04</span><h2>סימולטור שיטת ההכפלה</h2></div>
+    <div class="controls">
+      <label class="field"><span>הימור בסיס (₪)</span><input id="baseIn" type="number" min="1" value="10" /></label>
+      <label class="field"><span>מקור היחס</span>
+        <select id="oddsModeSel"><option value="fixed">יחס קבוע</option><option value="real">יחסים אמיתיים מהנתונים</option></select>
+      </label>
+      <label class="field" id="fixedOddsWrap"><span>יחס תיקו קבוע</span><input id="fixedOddsIn" type="number" min="1.1" step="0.1" value="3" /></label>
+      <label class="field"><span>תקרה להימור (₪)</span><input id="capIn" type="number" min="1" value="5000" /></label>
+    </div>
+    <div class="thresh">
+      <div class="thresh-l" id="threshLbl"></div>
+      <input id="threshRange" type="range" min="0" max="10" value="0" />
+    </div>
+    <div id="simOut"></div>
+  </section>
+
+  <!-- 05 סורק -->
+  <section class="card hidden" id="sweepSec"></section>
+
+  <section class="reality">
+    <div class="reality-h">🎯 מה לחפש בתוצאות</div>
+    <p>שים לב לפער בין <strong>אחוז התיקו האמיתי</strong> לבין מה שהיחס מגלם (1 חלקי היחס). אם קבוצה עושה תיקו ב־30% אבל היחס מגלם רק 27% — שם מסתתר יתרון. ההכפלה עצמה לא יוצרת יתרון; היא רק מזיזה מתי ההפסד מגיע. עמודה "מרוויחה" שצבועה אדום = אשליה, כי בדרך פשטת את הרגל.</p>
+    <div class="install">📲 <strong>להוספה למסך הבית:</strong> ב־Chrome גע בשלוש הנקודות ← "הוספה למסך הבית" ← "הוסף". ייווצר אייקון שפותח את הכלי כמו אפליקציה.</div>
+  </section>
+  <div class="foot" id="storageNote">DrawLab · הנתונים נשמרים במכשיר שלך בלבד.</div>
+</div>
+
+<script>
+"use strict";
+/* ===== קבועים ===== */
+var LEAGUE_MAP = { E0:"אנגליה — Premier League", SP1:"ספרד — La Liga", I1:"איטליה — Serie A", D1:"גרמניה — Bundesliga", F1:"צרפת — Ligue 1" };
+var DRAW_ODDS_COLS = ["AvgD","B365D","PSD","PSCD","BbAvD","IWD","WHD","VCD","MaxD"];
+var TARGET_FILES = [
+  {season:"2023/24", url:"https://www.football-data.co.uk/mmz4281/2324/E0.csv",  label:"אנגליה 23/24"},
+  {season:"2023/24", url:"https://www.football-data.co.uk/mmz4281/2324/SP1.csv", label:"ספרד 23/24"},
+  {season:"2023/24", url:"https://www.football-data.co.uk/mmz4281/2324/I1.csv",  label:"איטליה 23/24"},
+  {season:"2024/25", url:"https://www.football-data.co.uk/mmz4281/2425/E0.csv",  label:"אנגליה 24/25"},
+  {season:"2024/25", url:"https://www.football-data.co.uk/mmz4281/2425/SP1.csv", label:"ספרד 24/25"},
+  {season:"2024/25", url:"https://www.football-data.co.uk/mmz4281/2425/I1.csv",  label:"איטליה 24/25"}
+];
+
+/* ===== state ===== */
+var state = { matches:[], sources:[], team:"", leagueFilter:"ALL", seasonFilter:"ALL",
+  base:10, fixedOdds:3, oddsMode:"fixed", threshold:0, cap:5000 };
+var storageOK = true;
+
+/* ===== עזרים ===== */
+function fmt(n){ return new Intl.NumberFormat("he-IL",{maximumFractionDigits:0}).format(n); }
+function el(id){ return document.getElementById(id); }
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+function parseDate(s){
+  if(!s) return null;
+  var m = String(s).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(m){ var d=+m[1], mo=+m[2], y=m[3]; y = y.length===2 ? 2000+ +y : +y; return new Date(y, mo-1, d); }
+  var dt = new Date(s); return isNaN(dt) ? null : dt;
+}
+function seasonLabel(date){
+  if(!date) return "לא ידוע";
+  var y=date.getFullYear(), sy = date.getMonth()>=6 ? y : y-1;
+  return sy + "/" + String((sy+1)%100).padStart(2,"0");
+}
+
+/* מנתח CSV עמיד (מרכאות, פסיקים, שורות) */
+function parseCSV(text){
+  var rows=[], row=[], field="", i=0, inQ=false, c;
+  text = text.replace(/\r\n/g,"\n").replace(/\r/g,"\n");
+  for(i=0;i<text.length;i++){
+    c=text[i];
+    if(inQ){
+      if(c === '"'){ if(text[i+1]==='"'){ field+='"'; i++; } else inQ=false; }
+      else field+=c;
+    } else {
+      if(c === '"') inQ=true;
+      else if(c === ','){ row.push(field); field=""; }
+      else if(c === '\n'){ row.push(field); rows.push(row); row=[]; field=""; }
+      else field+=c;
+    }
+  }
+  if(field.length || row.length){ row.push(field); rows.push(row); }
+  if(!rows.length) return [];
+  var headers = rows[0].map(function(h){return h.trim();});
+  var out=[];
+  for(var r=1;r<rows.length;r++){
+    if(rows[r].length===1 && rows[r][0]==="") continue;
+    var obj={};
+    for(var k=0;k<headers.length;k++) obj[headers[k]] = rows[r][k];
+    out.push(obj);
+  }
+  return out;
+}
+
+function pick(row, keys){
+  var lower={}; for(var k in row) lower[k.toLowerCase().trim()] = row[k];
+  for(var j=0;j<keys.length;j++){ var v=lower[keys[j].toLowerCase()];
+    if(v!==undefined && v!==null && String(v).trim()!=="") return v; }
+  return undefined;
+}
+
+function normalizeRows(rows){
+  var out=[];
+  for(var i=0;i<rows.length;i++){
+    var row=rows[i];
+    var home=pick(row,["HomeTeam","Home","בית"]), away=pick(row,["AwayTeam","Away","חוץ"]);
+    if(!home||!away) continue;
+    var dateRaw=pick(row,["Date","תאריך"]); var date=parseDate(dateRaw);
+    var hg=pick(row,["FTHG","HG","HomeGoals","שערי בית"]); var ag=pick(row,["FTAG","AG","AwayGoals","שערי חוץ"]);
+    hg = hg===undefined?undefined:Number(hg); ag = ag===undefined?undefined:Number(ag);
+    var result=pick(row,["FTR","Result","תוצאה"]); if(result) result=String(result).trim().toUpperCase();
+    if(["H","D","A"].indexOf(result)<0){
+      if(hg!==undefined && ag!==undefined && !isNaN(hg) && !isNaN(ag)) result = hg>ag?"H":hg<ag?"A":"D";
+      else continue;
+    }
+    var drawOdds=null; var ro=pick(row,["DrawOdds","יחס תיקו"].concat(DRAW_ODDS_COLS));
+    if(ro!==undefined){ var n=Number(ro); if(!isNaN(n)&&n>1) drawOdds=n; }
+    var div=pick(row,["Div","League","ליגה"]); var league=LEAGUE_MAP[div]||div||"לא ידוע";
+    var season=pick(row,["Season","עונה"])||seasonLabel(date);
+    out.push({ ms: date?date.getTime():null,
+      dateStr: date?date.toLocaleDateString("he-IL"):String(dateRaw||""),
+      home:String(home).trim(), away:String(away).trim(),
+      hg:hg, ag:ag, result:result, isDraw:result==="D", drawOdds:drawOdds, league:league, season:season });
+  }
+  return out;
+}
+
+function mergeMatches(existing, incoming){
+  var seen={}; existing.forEach(function(m){ seen[m.season+"|"+m.dateStr+"|"+m.home+"|"+m.away]=1; });
+  var merged=existing.slice();
+  incoming.forEach(function(m){ var k=m.season+"|"+m.dateStr+"|"+m.home+"|"+m.away;
+    if(!seen[k]){ seen[k]=1; merged.push(m); } });
+  merged.sort(function(a,b){ return (a.ms&&b.ms)?a.ms-b.ms:0; });
+  return merged;
+}
+
+function teamStats(matches, team){
+  var seq=matches.filter(function(m){return m.home===team||m.away===team;});
+  var total=seq.length, draws=seq.filter(function(m){return m.isDraw;}).length;
+  var longest=0, run=0, runLengths=[];
+  seq.forEach(function(m){ if(m.isDraw){ if(run>0)runLengths.push(run); if(run>longest)longest=run; run=0; } else run++; });
+  var cur=run; if(run>longest)longest=run;
+  var dist={}; runLengths.forEach(function(l){ dist[l]=(dist[l]||0)+1; });
+  var wo=seq.filter(function(m){return m.isDraw&&m.drawOdds;});
+  var avg = wo.length ? wo.reduce(function(a,m){return a+m.drawOdds;},0)/wo.length : null;
+  return { seq:seq, total:total, draws:draws, drawPct: total?draws/total:0, longest:longest, cur:cur, dist:dist, avgDrawOdds:avg };
+}
+
+function simulate(seq, o){
+  var noDraw=0, betting=false, stake=o.base, pl=0, maxStake=0, busts=0, cyclesWon=0, lr=0, mlr=0, equity=[];
+  for(var i=0;i<seq.length;i++){
+    var m=seq[i];
+    var odds = o.oddsMode==="real" ? (m.drawOdds||o.fixedOdds) : o.fixedOdds;
+    if(!betting && noDraw>=o.threshold){ betting=true; stake=o.base; }
+    if(betting){
+      if(stake>o.cap){ busts++; betting=false; stake=o.base; lr=0; }
+      else {
+        if(stake>maxStake) maxStake=stake;
+        if(m.isDraw){ pl += stake*(odds-1); cyclesWon++; betting=false; stake=o.base; lr=0; }
+        else { pl -= stake; stake*=2; lr++; if(lr>mlr)mlr=lr; }
+      }
+    }
+    equity.push({x:i+1, y:Math.round(pl)});
+    noDraw = m.isDraw ? 0 : noDraw+1;
+  }
+  return { pl:pl, maxStake:maxStake, busts:busts, cyclesWon:cyclesWon, maxLosingRun:mlr, equity:equity };
+}
+
+/* ===== גרפים SVG (אופליין) ===== */
+function svgBars(items, opts){
+  opts=opts||{}; var W=600, H=opts.h||200, padT=14, padB=28, padX=10;
+  var innerW=W-padX*2, plotH=H-padT-padB;
+  var vals=items.map(function(d){return d.value;});
+  var maxV=Math.max.apply(null,[0].concat(vals)), minV=Math.min.apply(null,[0].concat(vals));
+  var range=(maxV-minV)||1;
+  var yOf=function(v){ return padT + plotH*((maxV-v)/range); };
+  var zeroY=yOf(0);
+  var n=items.length, bw=innerW/n, barW=bw*0.66;
+  var s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">';
+  s+='<line x1="'+padX+'" y1="'+zeroY.toFixed(1)+'" x2="'+(W-padX)+'" y2="'+zeroY.toFixed(1)+'" stroke="#2a5a46" stroke-width="1"/>';
+  items.forEach(function(d,i){
+    var cx=padX+bw*i+bw/2, x=cx-barW/2, y=yOf(d.value), h=Math.abs(y-zeroY);
+    var top=Math.min(y,zeroY);
+    s+='<rect x="'+x.toFixed(1)+'" y="'+top.toFixed(1)+'" width="'+barW.toFixed(1)+'" height="'+Math.max(1,h).toFixed(1)+'" rx="3" fill="'+(d.color||"#f2b705")+'"><title>'+esc(d.title||(d.label+": "+d.value))+'</title></rect>';
+    s+='<text x="'+cx.toFixed(1)+'" y="'+(H-9)+'" fill="#8fa99b" font-size="13" text-anchor="middle" font-family="Assistant">'+esc(d.label)+'</text>';
+  });
+  s+='</svg>'; return s;
+}
+function svgLine(pts, opts){
+  opts=opts||{}; var W=600, H=opts.h||210, padT=12, padB=20, padX=10;
+  var innerW=W-padX*2, plotH=H-padT-padB;
+  var ys=pts.map(function(p){return p.y;});
+  var maxV=Math.max.apply(null,[0].concat(ys)), minV=Math.min.apply(null,[0].concat(ys));
+  var range=(maxV-minV)||1, n=pts.length;
+  var xOf=function(x){ return padX + innerW*((x-1)/Math.max(1,n-1)); };
+  var yOf=function(v){ return padT + plotH*((maxV-v)/range); };
+  var zeroY=yOf(0);
+  var d=""; pts.forEach(function(p,i){ d+=(i?"L":"M")+xOf(p.x).toFixed(1)+" "+yOf(p.y).toFixed(1)+" "; });
+  var s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">';
+  s+='<line x1="'+padX+'" y1="'+zeroY.toFixed(1)+'" x2="'+(W-padX)+'" y2="'+zeroY.toFixed(1)+'" stroke="#8fa99b" stroke-dasharray="4 4" stroke-width="1"/>';
+  s+='<path d="'+d+'" fill="none" stroke="#3dd68c" stroke-width="2"/>';
+  s+='</svg>'; return s;
+}
+
+/* ===== שמירה מקומית ===== */
+function saveState(){
+  if(!storageOK) return;
+  try{
+    localStorage.setItem("drawlab_data", JSON.stringify({ matches:state.matches, sources:state.sources }));
+    localStorage.setItem("drawlab_set", JSON.stringify({ base:state.base, fixedOdds:state.fixedOdds,
+      oddsMode:state.oddsMode, threshold:state.threshold, cap:state.cap, team:state.team,
+      leagueFilter:state.leagueFilter, seasonFilter:state.seasonFilter }));
+  }catch(e){ storageOK=false; el("storageNote").textContent="שים לב: הדפדפן חוסם שמירה מקומית, אז הנתונים יישמרו רק לפגישה הזו."; }
+}
+function loadState(){
+  try{
+    var d=localStorage.getItem("drawlab_data");
+    if(d){ var o=JSON.parse(d); state.matches=o.matches||[]; state.sources=o.sources||[]; }
+    var st=localStorage.getItem("drawlab_set");
+    if(st){ var s=JSON.parse(st); ["base","fixedOdds","oddsMode","threshold","cap","team","leagueFilter","seasonFilter"].forEach(function(k){ if(s[k]!==undefined) state[k]=s[k]; }); }
+  }catch(e){ storageOK=false; }
+}
+
+/* ===== טעינת קבצים ===== */
+function ingestFiles(fileList){
+  var files=[].slice.call(fileList);
+  if(!files.length) return;
+  var done=0, acc=[];
+  files.forEach(function(file){
+    var reader=new FileReader();
+    reader.onload=function(){
+      try{ acc=acc.concat(normalizeRows(parseCSV(String(reader.result)))); }catch(e){}
+      if(state.sources.indexOf(file.name)<0) state.sources.push(file.name);
+      done++;
+      if(done===files.length){ state.matches=mergeMatches(state.matches, acc); afterData(); }
+    };
+    reader.readAsText(file);
+  });
+}
+
+function autoFetch(){
+  var btn=el("autoBtn"); btn.disabled=true; btn.innerHTML='<span class="spin">⏳</span> מושך…';
+  var ok=0, fail=0, acc=[], idx=0;
+  function next(){
+    if(idx>=TARGET_FILES.length){ finish(); return; }
+    var f=TARGET_FILES[idx++];
+    fetch(f.url).then(function(r){ if(!r.ok) throw 0; return r.text(); })
+      .then(function(t){ acc=acc.concat(normalizeRows(parseCSV(t)));
+        if(state.sources.indexOf(f.label)<0) state.sources.push(f.label); ok++; next(); })
+      .catch(function(){ fail++; next(); });
+  }
+  function finish(){
+    if(acc.length) state.matches=mergeMatches(state.matches, acc);
+    btn.disabled=false; btn.innerHTML='☁️ נסה למשוך אוטומטית (6 הקבצים)';
+    var m=el("fetchMsg");
+    if(fail===0) m.innerHTML='<div class="fmsg ok">✅ כל '+ok+' הקבצים נמשכו בהצלחה.</div>';
+    else if(ok>0) m.innerHTML='<div class="fmsg warn">⚠️ '+ok+' נמשכו, '+fail+' נחסמו (CORS). את החסומים הורד ידנית מהלינקים.</div>';
+    else m.innerHTML='<div class="fmsg err">⚠️ המשיכה הישירה נחסמה על ידי האתר (CORS) — נפוץ ולא באשמתך. הורד את הקבצים מהלינקים ובחר אותם עם הכפתור למעלה.</div>';
+    afterData();
+  }
+  next();
+}
+
+function demoData(){
+  var seed=42; function rng(){ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; }
+  var rows=[], seasons=["2022/23","2023/24","2024/25"], opp=["יריבה א׳","יריבה ב׳","יריבה ג׳","יריבה ד׳","יריבה ה׳","יריבה ו׳"];
+  seasons.forEach(function(season,si){
+    var month=7, day=12, year=2022+si;
+    for(var i=0;i<38;i++){
+      var r=rng(), isDraw=r<0.26, res=isDraw?"D":(r<0.62?"H":"A");
+      var hg=isDraw?1:(res==="H"?2:0), ag=isDraw?1:(res==="H"?0:2);
+      day+=7; if(day>28){day-=28;month++;} if(month>12){month-=12;year++;}
+      rows.push({ Date:String(day).padStart(2,"0")+"/"+String(month).padStart(2,"0")+"/"+year,
+        HomeTeam:i%2?opp[i%6]:"קבוצת הדגמה", AwayTeam:i%2?"קבוצת הדגמה":opp[i%6],
+        FTHG:hg, FTAG:ag, FTR:res, DrawOdds:(3.0+rng()*0.7).toFixed(2), Season:season, League:"ליגת הדגמה" });
+    }
+  });
+  return normalizeRows(rows);
+}
+
+/* ===== רינדור ===== */
+function afterData(){ updateDataInfo(); updateSelects(); refreshResults(); saveState(); }
+
+function updateDataInfo(){
+  var li=el("loadedInfo");
+  if(!state.matches.length){ li.innerHTML=""; el("verify").innerHTML=""; return; }
+  var leagues={}, seasons={}; state.matches.forEach(function(m){ leagues[m.league]=1; seasons[m.season]=1; });
+  li.innerHTML='<div class="loaded"><div style="display:flex;align-items:center;gap:10px;"><span class="ok-c">✔</span>'+
+    '<div><strong>'+fmt(state.matches.length)+' משחקים · '+Object.keys(leagues).length+' ליגות · '+Object.keys(seasons).length+' עונות</strong>'+
+    '<span class="src">'+esc(state.sources.join(" · "))+'</span></div></div>'+
+    '<button class="clear" id="clearBtn">🗑 נקה הכל</button></div>';
+  el("clearBtn").onclick=function(){ state.matches=[]; state.sources=[]; state.team=""; state.leagueFilter="ALL"; state.seasonFilter="ALL"; el("fetchMsg").innerHTML=""; afterData(); };
+  // אימות
+  var by={}; state.matches.forEach(function(m){ var k=m.league+" · "+m.season;
+    by[k]=by[k]||{games:0,draws:0,teams:{}}; by[k].games++; if(m.isDraw)by[k].draws++; by[k].teams[m.home]=1; by[k].teams[m.away]=1; });
+  var keys=Object.keys(by).sort();
+  var vh='<div class="verify"><div class="verify-h">ℹ️ אימות שלמות הנתונים</div>';
+  keys.forEach(function(k){ var v=by[k], nt=Object.keys(v.teams).length, exp=nt>0?nt*(nt-1):0, comp=exp>0&&v.games===exp;
+    vh+='<div class="vrow"><span class="vseason">'+esc(k)+'</span><span class="vg">'+v.games+' משחקים · '+nt+' קבוצות · '+v.draws+' תיקו</span>'+
+      '<span class="vflag '+(comp?"ok":"warn")+'">'+(comp?"✔ עונה מלאה":"⚠ צפוי "+(exp||"?"))+'</span></div>';
+  });
+  vh+='</div>'; el("verify").innerHTML=vh;
+}
+
+function leaguesList(){ var s={}; state.matches.forEach(function(m){s[m.league]=1;}); return Object.keys(s).sort(); }
+function seasonsList(){ var s={}; state.matches.forEach(function(m){s[m.season]=1;}); return Object.keys(s).sort(); }
+function teamsList(){
+  var pool = state.leagueFilter==="ALL" ? state.matches : state.matches.filter(function(m){return m.league===state.leagueFilter;});
+  var s={}; pool.forEach(function(m){ s[m.home]=1; s[m.away]=1; });
+  return Object.keys(s).sort(function(a,b){return a.localeCompare(b,"he");});
+}
+
+function fillSelect(sel, opts, value){
+  sel.innerHTML=opts.map(function(o){ return '<option value="'+esc(o.v)+'"'+(o.v===value?" selected":"")+'>'+esc(o.t)+'</option>'; }).join("");
+}
+function updateSelects(){
+  if(!state.matches.length){ el("selectSec").classList.add("hidden"); return; }
+  el("selectSec").classList.remove("hidden");
+  var lg=[{v:"ALL",t:"כל הליגות"}].concat(leaguesList().map(function(l){return{v:l,t:l};}));
+  fillSelect(el("leagueSel"), lg, state.leagueFilter);
+  var tm=[{v:"",t:"— בחר קבוצה —"}].concat(teamsList().map(function(t){return{v:t,t:t};}));
+  fillSelect(el("teamSel"), tm, state.team);
+  var ss=[{v:"ALL",t:"כל העונות"}].concat(seasonsList().map(function(s){return{v:s,t:s};}));
+  fillSelect(el("seasonSel"), ss, state.seasonFilter);
+}
+
+function filteredMatches(){
+  var m=state.matches;
+  if(state.leagueFilter!=="ALL") m=m.filter(function(x){return x.league===state.leagueFilter;});
+  if(state.seasonFilter!=="ALL") m=m.filter(function(x){return x.season===state.seasonFilter;});
+  return m;
+}
+
+function refreshResults(){
+  var hasTeam = state.team && state.matches.length;
+  ["statsSec","simSec","sweepSec"].forEach(function(id){ el(id).classList.toggle("hidden", !hasTeam); });
+  if(!hasTeam) return;
+  var stats=teamStats(filteredMatches(), state.team);
+  renderStats(stats);
+  var hasReal = stats.seq.some(function(m){return m.drawOdds;});
+  var opt=el("oddsModeSel").querySelector('option[value="real"]'); if(opt){ opt.disabled=!hasReal; opt.textContent = hasReal?"יחסים אמיתיים מהנתונים":"יחסים אמיתיים (לא זמין)"; }
+  el("fixedOddsWrap").classList.toggle("hidden", state.oddsMode!=="fixed");
+  updateThreshLbl();
+  renderSimSweep(stats);
+}
+
+function renderStats(stats){
+  var kpi=function(l,v,c){ return '<div class="kpi '+(c||"")+'"><div class="kpi-v">'+v+'</div><div class="kpi-l">'+l+'</div></div>'; };
+  var h='<div class="chead"><span class="num">03</span><h2>סטטיסטיקת תיקו — '+esc(state.team)+'</h2></div>';
+  h+='<div class="kpis">'+
+    kpi("משחקים",fmt(stats.total))+kpi("תיקו",fmt(stats.draws),"accent")+
+    kpi("אחוז תיקו",(stats.drawPct*100).toFixed(1)+"%")+
+    kpi("הכי ארוך ללא תיקו",fmt(stats.longest),"warn")+
+    kpi("רצף נוכחי",fmt(stats.cur))+
+    kpi("יחס תיקו ממוצע",stats.avgDrawOdds?stats.avgDrawOdds.toFixed(2):"—")+'</div>';
+  h+='<div class="ledger-h"><span>לוח המשחקים — כל ריבוע הוא משחק לפי הסדר</span>'+
+     '<span class="leg"><i class="cell draw"></i> תיקו &nbsp; <i class="cell nodraw"></i> ללא תיקו</span></div>';
+  h+='<div class="ledger">';
+  stats.seq.forEach(function(m){ h+='<span class="cell '+(m.isDraw?"draw":"nodraw")+'" title="'+esc(m.dateStr+" · "+m.home+" "+(m.hg!=null?m.hg:"")+"-"+(m.ag!=null?m.ag:"")+" "+m.away+(m.drawOdds?" · יחס "+m.drawOdds:""))+'"></span>'; });
+  h+='</div>';
+  var dist=Object.keys(stats.dist).map(function(k){return {len:+k,c:stats.dist[k]};}).sort(function(a,b){return a.len-b.len;});
+  if(dist.length){
+    h+='<div class="chart-t">כמה פעמים קרה רצף באורך X ללא תיקו (שהסתיים בתיקו)</div>';
+    h+='<div class="chart">'+svgBars(dist.map(function(d){return {label:d.len, value:d.c, color:"#f2b705", title:"רצף "+d.len+": "+d.c+" פעמים"};}),{h:190})+'</div>';
+  }
+  el("statsSec").innerHTML=h;
+}
+
+function updateThreshLbl(){
+  el("threshLbl").innerHTML='התחל להמר רק אחרי <strong>'+state.threshold+'</strong> משחקים רצופים ללא תיקו'+
+    '<span class="thresh-h">'+(state.threshold===0?"מהמשחק הראשון":"ההימור הראשון על המשחק ה־"+(state.threshold+1)+" ברצף")+'</span>';
+}
+
+function renderSimSweep(stats){
+  var o={ threshold:state.threshold, base:state.base, oddsMode:state.oddsMode, fixedOdds:state.fixedOdds, cap:state.cap };
+  var sim=simulate(stats.seq, o);
+  var sk=function(l,v,c){ return '<div class="simkpi '+(c||"")+'"><div class="simkpi-v">'+v+'</div><div class="simkpi-l">'+l+'</div></div>'; };
+  var h='<div class="simkpis">'+
+    '<div class="simkpi big '+(sim.pl>=0?"good":"danger")+'"><div class="simkpi-v">'+(sim.pl>=0?"+":"")+fmt(sim.pl)+' ₪</div><div class="simkpi-l">רווח/הפסד נטו</div></div>'+
+    sk("סבבים שנתפסו",fmt(sim.cyclesWon))+
+    sk("ההימור הכי גדול",fmt(sim.maxStake)+" ₪","warn")+
+    sk("רצף הפסדים ארוך",fmt(sim.maxLosingRun),"warn")+
+    sk("חצית את התקרה",fmt(sim.busts),sim.busts>0?"danger":"good")+'</div>';
+  if(sim.busts>0) h+='<div class="alert">⚠️ בסף הזה חצית את תקרת ההימור '+sim.busts+' פעמים — בפועל נגמר לך הכסף. הרווח שמוצג מתעלם מכך שאחרי פשיטת רגל אין המשך.</div>';
+  h+='<div class="chart-t">עקומת ההון לאורך המשחקים (₪ מצטבר)</div><div class="chart">'+svgLine(sim.equity,{h:200})+'</div>';
+  el("simOut").innerHTML=h;
+  // סורק
+  var sweep=[]; for(var t=0;t<=10;t++){ var r=simulate(stats.seq,{threshold:t,base:state.base,oddsMode:state.oddsMode,fixedOdds:state.fixedOdds,cap:state.cap}); sweep.push({t:t,pl:Math.round(r.pl),busts:r.busts}); }
+  var safe=sweep.filter(function(s){return s.busts===0;}); var pool=safe.length?safe:sweep;
+  var best=pool.reduce(function(a,b){return b.pl>a.pl?b:a;});
+  var sh='<div class="chead"><span class="num">05</span><h2>מאיזה משחק ברצף הכי משתלם?</h2></div>';
+  sh+='<p class="lead">הרצנו את השיטה עם כל סף התחלה מ־0 עד 10 על אותם נתונים בדיוק. כל עמודה = הרווח/הפסד אם היית מתחיל להמר רק אחרי X משחקים ללא תיקו.</p>';
+  sh+='<div class="best '+(best.pl>=0?"good":"bad")+'">'+(best.pl>=0?"📈":"📉")+' הכי טוב: להתחיל אחרי <strong>'+best.t+'</strong> משחקים ללא תיקו → <strong>'+(best.pl>=0?"+":"")+fmt(best.pl)+' ₪</strong>'+(best.busts>0?'<span class="best-w"> (עם '+best.busts+' פשיטות רגל — לא בר־ביצוע)</span>':'')+'</div>';
+  sh+='<div class="chart">'+svgBars(sweep.map(function(d){return {label:d.t, value:d.pl, color:d.busts>0?"#e5484d":(d.pl>=0?"#3dd68c":"#c98a2b"), title:"סף "+d.t+": "+fmt(d.pl)+" ₪"+(d.busts?" · "+d.busts+" פשיטות רגל":"")};}),{h:220})+'</div>';
+  sh+='<div class="sweep-leg"><span><i style="background:#3dd68c"></i> רווחי ובר־ביצוע</span><span><i style="background:#c98a2b"></i> מפסיד</span><span><i style="background:#e5484d"></i> פשט את הרגל</span></div>';
+  el("sweepSec").innerHTML=sh;
+}
+
+/* ===== קישור אירועים ===== */
+function bind(){
+  el("linksGrid").innerHTML=TARGET_FILES.map(function(f){ return '<a class="lnk" href="'+f.url+'" target="_blank" rel="noreferrer">⬇ '+esc(f.label)+'</a>'; }).join("");
+  el("fileInput").addEventListener("change", function(e){ ingestFiles(e.target.files); e.target.value=""; });
+  el("autoBtn").addEventListener("click", autoFetch);
+  el("demoBtn").addEventListener("click", function(){ state.matches=demoData(); state.sources=["נתוני הדגמה (לא אמיתיים)"]; state.team="קבוצת הדגמה"; state.leagueFilter="ALL"; state.seasonFilter="ALL"; afterData(); });
+  el("leagueSel").addEventListener("change", function(e){ state.leagueFilter=e.target.value; state.team=""; updateSelects(); refreshResults(); saveState(); });
+  el("teamSel").addEventListener("change", function(e){ state.team=e.target.value; refreshResults(); saveState(); });
+  el("seasonSel").addEventListener("change", function(e){ state.seasonFilter=e.target.value; refreshResults(); saveState(); });
+  el("baseIn").addEventListener("input", function(e){ state.base=Math.max(1,Number(e.target.value)||1); softRefresh(); });
+  el("capIn").addEventListener("input", function(e){ state.cap=Math.max(1,Number(e.target.value)||1); softRefresh(); });
+  el("fixedOddsIn").addEventListener("input", function(e){ state.fixedOdds=Math.max(1.1,Number(e.target.value)||1.1); softRefresh(); });
+  el("oddsModeSel").addEventListener("change", function(e){ state.oddsMode=e.target.value; el("fixedOddsWrap").classList.toggle("hidden", state.oddsMode!=="fixed"); softRefresh(); });
+  el("threshRange").addEventListener("input", function(e){ state.threshold=Number(e.target.value); updateThreshLbl(); softRefresh(); });
+}
+function softRefresh(){
+  if(!(state.team && state.matches.length)) return;
+  renderSimSweep(teamStats(filteredMatches(), state.team));
+  saveState();
+}
+
+/* ===== init ===== */
+function init(){
+  loadState();
+  el("baseIn").value=state.base; el("capIn").value=state.cap; el("fixedOddsIn").value=state.fixedOdds;
+  el("oddsModeSel").value=state.oddsMode; el("threshRange").value=state.threshold;
+  bind();
+  afterData();
+}
+init();
+</script>
+
+<!-- PWA Service Worker -->
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw.js').then(function(reg) {
+      reg.addEventListener('updatefound', function() {
+        var newWorker = reg.installing;
+        newWorker.addEventListener('statechange', function() {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            var bar = document.createElement('div');
+            bar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#f2b705;color:#082019;text-align:center;padding:14px 16px;font-weight:700;font-size:14px;z-index:9999;cursor:pointer;font-family:Assistant,sans-serif;';
+            bar.textContent = '\uD83D\uDD04 \u05d2\u05e8\u05e1\u05d4 \u05d7\u05d3\u05e9\u05d4 \u05d6\u05de\u05d9\u05e0\u05d4 \u2014 \u05dc\u05d7\u05e5 \u05dc\u05e8\u05e2\u05e0\u05d5\u05df';
+            bar.onclick = function() { window.location.reload(); };
+            document.body.appendChild(bar);
+          }
+        });
+      });
+    }).catch(function(err) {
+      console.log('SW registration failed:', err);
+    });
+  });
+}
+</script>
+</body>
+</html>
