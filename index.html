@@ -631,6 +631,76 @@ function updateDataInfo(){
         : '') +
       '<span class="vflag '+(comp?"ok":"warn")+'">'+( comp?"✔ עונה מלאה":"⚠ צפוי "+(exp||"?"))+'</span></div>';
   });
+  // סיכום לפי ליגה
+  var leagueSummary = {};
+  keys.forEach(function(k){
+    var v=by[k];
+    var parts=k.split(" · "); var league=parts[0], season=parts[1];
+    var top4 = top4map[league+"|"+season] || {};
+    var top4names = Object.keys(top4);
+    var hasTop4 = top4names.length===4;
+    if(!leagueSummary[league]) leagueSummary[league]={ seasons:0, games:0, draws:0, maxStreaks:[], streaksOver10:0, gamesNo4:0, drawsNo4:0, maxStreaksNo4:[] };
+    var ls=leagueSummary[league];
+    ls.seasons++;
+    ls.games+=v.games; ls.draws+=v.draws;
+    // רצף מקסימלי לעונה זו
+    var maxStreak=0, streaksOver10=0;
+    Object.keys(v.teamMatches).forEach(function(team){
+      var arr=v.teamMatches[team], cur=0;
+      arr.forEach(function(e){
+        if(!e.isDraw){ cur++; if(cur>maxStreak) maxStreak=cur; }
+        else { if(cur>10) streaksOver10++; cur=0; }
+      });
+      if(cur>10) streaksOver10++;
+      if(cur>maxStreak) maxStreak=cur;
+    });
+    ls.maxStreaks.push(maxStreak);
+    ls.streaksOver10+=streaksOver10;
+    // בלי מובילות
+    if(hasTop4){
+      var gNo4=0, dNo4=0, mxNo4=0;
+      Object.keys(v.teamMatches).forEach(function(team){
+        if(top4[team]) return;
+        var arr=v.teamMatches[team], cur=0;
+        arr.forEach(function(e){
+          gNo4++; if(e.isDraw) dNo4++;
+          if(!e.isDraw){ cur++; if(cur>mxNo4) mxNo4=cur; } else { cur=0; }
+        });
+        if(cur>mxNo4) mxNo4=cur;
+      });
+      ls.gamesNo4+=Math.round(gNo4/2); ls.drawsNo4+=Math.round(dNo4/2);
+      ls.maxStreaksNo4.push(mxNo4);
+    }
+  });
+
+  // רנדר סיכום
+  vh+='<div class="verify-h" style="margin-top:18px;border-top:1px solid #1e4a38;padding-top:14px">🏆 סיכום לפי ליגה (ניחוח על 5 עונות)</div>';
+  var leagueOrder = Object.keys(leagueSummary).sort(function(a,b){
+    // מיין לפי אחוז תיקו יורד
+    var pa=leagueSummary[a], pb=leagueSummary[b];
+    return (pb.draws/pb.games)-(pa.draws/pa.games);
+  });
+  vh+='<table class="rtable" style="margin-top:8px"><tr>'+
+    '<th>ליגה</th><th>משחקים</th><th>תיקו %</th><th>רצף מקס בינוני</th><th>רצפים>10</th>'+
+    '<th>תיקו % בלי מובילות</th><th>רצף מקס בלי מובילות</th></tr>';
+  leagueOrder.forEach(function(league){
+    var ls=leagueSummary[league];
+    var drawPctAvg = ls.games>0 ? (ls.draws/ls.games*100).toFixed(1) : "?";
+    var avgMaxStreak = ls.maxStreaks.length>0 ? (ls.maxStreaks.reduce(function(a,b){return a+b;},0)/ls.maxStreaks.length).toFixed(1) : "?";
+    var drawPctNo4 = ls.gamesNo4>0 ? (ls.drawsNo4/ls.gamesNo4*100).toFixed(1) : "?";
+    var avgMaxStreakNo4 = ls.maxStreaksNo4.length>0 ? (ls.maxStreaksNo4.reduce(function(a,b){return a+b;},0)/ls.maxStreaksNo4.length).toFixed(1) : "?";
+    vh+='<tr>'+
+      '<td style="font-weight:700;color:#e8f0ea">'+esc(league)+'</td>'+
+      '<td>'+ls.games+'</td>'+
+      '<td class="'+(parseFloat(drawPctAvg)>=26?"sea":"")+'">'+drawPctAvg+'%</td>'+
+      '<td>'+avgMaxStreak+'</td>'+
+      '<td class="'+(ls.streaksOver10>5?"hot":"")+'">'+ls.streaksOver10+'</td>'+
+      '<td class="'+(parseFloat(drawPctNo4)>=27?"sea":"")+'">'+drawPctNo4+'%</td>'+
+      '<td>'+avgMaxStreakNo4+'</td>'+
+    '</tr>';
+  });
+  vh+='</table><p style="font-size:11.5px;color:#5f7a6d;margin-top:8px">🟡 צהוב = אחוז תיקו גבוה במיוחד | 🔴 אדום = רצפים מעל 10 גבוהים | הליגות מדורגות לפי אחוז תיקו יורד</p>';
+
   vh+='</div>'; el("verify").innerHTML=vh;
 }
 
