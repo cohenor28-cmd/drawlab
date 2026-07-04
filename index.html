@@ -61,11 +61,12 @@
   .clear:active{border-color:#e5484d;color:#e5484d;}
   .verify{margin-top:16px;border-top:1px solid #143529;padding-top:16px;}
   .verify-h{font-size:13px;font-weight:700;color:#8fa99b;margin-bottom:10px;}
-  .vrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;background:#0d2e23;
-    border-radius:8px;padding:8px 12px;margin-bottom:6px;}
-  .vseason{font-family:'Rubik';font-weight:700;min-width:150px;}
-  .vg{color:#a8c0b3;flex:1;}
-  .vflag{font-weight:600;font-size:12px;}
+  .vrow{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:13px;background:#0d2e23;
+    border-radius:8px;padding:10px 12px;margin-bottom:6px;}
+  .vseason{font-family:'Rubik';font-weight:700;font-size:13.5px;grid-column:1;}
+  .vg{color:#a8c0b3;grid-column:1;font-size:12px;}
+  .vstreak{color:#f2b705;grid-column:1;font-size:11.5px;}
+  .vflag{font-weight:600;font-size:12px;grid-column:2;grid-row:1/4;align-self:center;text-align:right;}
   .vflag.ok{color:#3dd68c;} .vflag.warn{color:#f2b705;}
   .selects,.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;}
   .field{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:#a8c0b3;}
@@ -523,12 +524,35 @@ function updateDataInfo(){
   el("clearBtn").onclick=function(){ state.matches=[]; state.sources=[]; state.team=""; state.leagueFilter="ALL"; state.seasonFilter="ALL"; el("fetchMsg").innerHTML=""; afterData(); };
   // אימות
   var by={}; state.matches.forEach(function(m){ var k=m.league+" · "+m.season;
-    by[k]=by[k]||{games:0,draws:0,teams:{}}; by[k].games++; if(m.isDraw)by[k].draws++; by[k].teams[m.home]=1; by[k].teams[m.away]=1; });
+    by[k]=by[k]||{games:0,draws:0,teams:{},teamMatches:{}}; by[k].games++; if(m.isDraw)by[k].draws++;
+    by[k].teams[m.home]=1; by[k].teams[m.away]=1;
+    // אסוף משחקים לפי קבוצה לחישוב רצפים
+    [m.home, m.away].forEach(function(t){
+      by[k].teamMatches[t]=by[k].teamMatches[t]||[];
+      by[k].teamMatches[t].push(m.isDraw);
+    });
+  });
   var keys=Object.keys(by).sort();
   var vh='<div class="verify"><div class="verify-h">ℹ️ אימות שלמות הנתונים</div>';
-  keys.forEach(function(k){ var v=by[k], nt=Object.keys(v.teams).length, exp=nt>0?nt*(nt-1):0, comp=exp>0&&v.games===exp;
-    vh+='<div class="vrow"><span class="vseason">'+esc(k)+'</span><span class="vg">'+v.games+' משחקים · '+nt+' קבוצות · '+v.draws+' תיקו</span>'+
-      '<span class="vflag '+(comp?"ok":"warn")+'">'+(comp?"✔ עונה מלאה":"⚠ צפוי "+(exp||"?"))+'</span></div>';
+  keys.forEach(function(k){
+    var v=by[k], nt=Object.keys(v.teams).length, exp=nt>0?nt*(nt-1):0, comp=exp>0&&v.games===exp;
+    // חישוב רצפים לפי קבוצה
+    var maxStreak=0, streaksOver10=0;
+    Object.keys(v.teamMatches).forEach(function(team){
+      var arr=v.teamMatches[team], cur=0;
+      arr.forEach(function(isDraw){
+        if(!isDraw){ cur++; if(cur>maxStreak) maxStreak=cur; }
+        else { if(cur>10) streaksOver10++; cur=0; }
+      });
+      if(cur>10) streaksOver10++;
+      if(cur>maxStreak) maxStreak=cur;
+    });
+    var drawPct = v.games>0 ? Math.round(v.draws/v.games*100) : 0;
+    vh+='<div class="vrow">'+
+      '<span class="vseason">'+esc(k)+'</span>'+
+      '<span class="vg">'+v.games+' משחקים · '+nt+' קבוצות · '+v.draws+' תיקו ('+drawPct+'%)</span>'+
+      '<span class="vstreak">🔴 רצף מקסימלי: '+maxStreak+' משחקים · רצפים מעל 10: '+streaksOver10+'</span>'+
+      '<span class="vflag '+(comp?"ok":"warn")+'">'+( comp?"✔ עונה מלאה":"⚠ צפוי "+(exp||"?"))+'</span></div>';
   });
   vh+='</div>'; el("verify").innerHTML=vh;
 }
