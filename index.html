@@ -902,52 +902,107 @@ function runLab(){
   var out=el("labOut");
   var scope = filteredMatches();
   if(!scope.length){ out.innerHTML='<p class="lead">אין נתונים בהיקף שנבחר.</p>'; return; }
-  out.innerHTML='<p class="lead">מריץ…</p>';
-  var ptMap=prevTopMap(scope);
-  var g=groupLS(scope), entries=[], baselineOnly=0;
+  out.innerHTML='<p class="lead" id="labProgress">מריץ שילובים… 0%</p>';
+  // בנה רשימת קבוצות־עונה עם מידע מובילות לפי N
+  var byLg={};
+  scope.forEach(function(m){
+    byLg[m.league]=byLg[m.league]||{};
+    (byLg[m.league][m.season]=byLg[m.league][m.season]||[]).push(m);
+  });
+  // בנה מפתח [ליגה|עונה] → רשימת קבוצות מובילות לפי N (2,3,4)
+  var topNmap={};
+  Object.keys(byLg).forEach(function(lg){
+    var seasons=Object.keys(byLg[lg]).sort();
+    for(var i=0;i<seasons.length;i++){
+      var src = i>0 ? byLg[lg][seasons[i-1]] : byLg[lg][seasons[i]];
+      [2,3,4].forEach(function(n){
+        topNmap[lg+"|"+seasons[i]+"|"+n] = standingsTop(src,n);
+      });
+    }
+  });
+  var g=groupLS(scope), entries=[];
   Object.keys(g).forEach(function(k){
-    var ms=g[k], top3=ptMap[ms[0].league+"|"+ms[0].season], teams={};
-    if(top3===null) baselineOnly++;
+    var ms=g[k], teams={};
     ms.forEach(function(m){ teams[m.home]=1; teams[m.away]=1; });
+    var lg=ms[0].league, sn=ms[0].season;
     Object.keys(teams).forEach(function(t){
-      entries.push({ isTop: top3 ? top3.indexOf(t)>=0 : false, topKnown: top3!==null,
-        seq: ms.filter(function(m){return m.home===t||m.away===t;}) });
+      entries.push({
+        team:t, lg:lg, sn:sn,
+        top2: topNmap[lg+"|"+sn+"|2"] || [],
+        top3: topNmap[lg+"|"+sn+"|3"] || [],
+        top4: topNmap[lg+"|"+sn+"|4"] || [],
+        seq: ms.filter(function(m){return m.home===t||m.away===t;})
+      });
     });
   });
-  var TH=[0,8,10,12,14], ML=[0,3,5], TM=["all","excl","delay","only"], OD=["any","sweet","high"], BL=[false,true], res=[];
-  BL.forEach(function(bl){ OD.forEach(function(od){ TM.forEach(function(tm){ ML.forEach(function(ml){ TH.forEach(function(t){
-    var rng=oddsRangeOf(od);
-    var pl=0, cy=0, se=0, bu=0, mx=0, mc=0;
-    entries.forEach(function(e){
-      if(tm==="excl" && e.isTop) return;
-      if(tm==="only" && !(e.isTop && e.topKnown)) return;
-      var th = t + (tm==="delay" && e.isTop ? 3 : 0);
-      var opts={threshold:th, base:state.base, oddsMode:state.oddsMode,
-        fixedOdds:state.fixedOdds, cap:state.cap, minGamesLeft:ml, seasonAware:true, balanced:bl};
-      if(rng){ opts.oddsLo=rng[0]; opts.oddsHi=rng[1]; }
-      var r=simulate(e.seq,opts);
-      pl+=r.pl; cy+=r.cyclesWon; se+=r.seasonEndBusts; bu+=r.busts; mc+=r.missedCatches; if(r.maxStake>mx)mx=r.maxStake;
+  // פרמטרים
+  var TH=[]; for(var _t=0;_t<=15;_t++) TH.push(_t);
+  var ML=[0,3,5,8,10,12,14,16];
+  // TM: all / excl2 / excl3 / excl4 / only2 / only3 / only4
+  var TM=["all","excl2","excl3","excl4","only2","only3","only4"];
+  var OD=["any","low3","sweet","high"], BL=[false,true];
+  var total=TH.length*ML.length*TM.length*OD.length*BL.length;
+  var res=[], done=0;
+  function oddsRangeOfEx(od){
+    if(od==="low3") return [3.0,3.1];
+    if(od==="sweet") return [3.0,3.3];
+    if(od==="high") return [3.3,3.8];
+    return null;
+  }
+  function runChunk(){
+    var chunkSize=500, count=0;
+    while(done<total && count<chunkSize){
+      var idx=done;
+      var bi=Math.floor(idx/(TH.length*ML.length*TM.length*OD.length));
+      idx-=bi*(TH.length*ML.length*TM.length*OD.length);
+      var oi=Math.floor(idx/(TH.length*ML.length*TM.length));
+      idx-=oi*(TH.length*ML.length*TM.length);
+      var tmi=Math.floor(idx/(TH.length*ML.length));
+      idx-=tmi*(TH.length*ML.length);
+      var mli=Math.floor(idx/TH.length);
+      var thi=idx%TH.length;
+      var bl=BL[bi], od=OD[oi], tm=TM[tmi], ml=ML[mli], t=TH[thi];
+      var rng=oddsRangeOfEx(od);
+      var pl=0, cy=0, se=0, bu=0, mx=0, mc=0;
+      entries.forEach(function(e){
+        var topList = tm.startsWith("excl")||tm.startsWith("only") ?
+          (tm.endsWith("2")?e.top2:tm.endsWith("3")?e.top3:e.top4) : [];
+        if(tm.startsWith("excl") && topList.indexOf(e.team)>=0) return;
+        if(tm.startsWith("only") && topList.indexOf(e.team)<0) return;
+        var opts={threshold:t, base:state.base, oddsMode:state.oddsMode,
+          fixedOdds:state.fixedOdds, cap:state.cap, minGamesLeft:ml, seasonAware:true, balanced:bl};
+        if(rng){ opts.oddsLo=rng[0]; opts.oddsHi=rng[1]; }
+        var r=simulate(e.seq,opts);
+        pl+=r.pl; cy+=r.cyclesWon; se+=r.seasonEndBusts; bu+=r.busts; mc+=r.missedCatches; if(r.maxStake>mx)mx=r.maxStake;
+      });
+      res.push({t:t,ml:ml,tm:tm,od:od,bl:bl,pl:Math.round(pl),cy:cy,se:se,bu:bu,mc:mc,mx:mx});
+      done++; count++;
+    }
+    var pct=Math.round(done/total*100);
+    var prog=el("labProgress");
+    if(prog) prog.textContent='מריץ שילובים… '+pct+'%';
+    if(done<total){ setTimeout(runChunk,0); return; }
+    // סיים — רנדר תוצאות
+    res.sort(function(a,b){
+      var sa=(a.se===0&&a.bu===0)?1:0, sb=(b.se===0&&b.bu===0)?1:0;
+      if(sa!==sb) return sb-sa;
+      return b.pl-a.pl;
     });
-    res.push({t:t,ml:ml,tm:tm,od:od,bl:bl,pl:Math.round(pl),cy:cy,se:se,bu:bu,mc:mc,mx:mx});
-  });});});});});
-  res.sort(function(a,b){
-    var sa=(a.se===0&&a.bu===0)?1:0, sb=(b.se===0&&b.bu===0)?1:0;
-    if(sa!==sb) return sb-sa;
-    return b.pl-a.pl;
-  });
-  var tmLbl={all:"רגיל",excl:"בלי מובילות",delay:"מובילות +3",only:"רק מובילות"};
-  var odLbl={any:"הכל",sweet:"3.0–3.3",high:"3.3–3.8"};
-  var h='<p class="lead" style="margin-top:14px">נבדקו '+res.length+' שילובים (כולל מסנני יחס ואיזון) על '+entries.length+' קבוצות־עונה. מדורג: קודם שילובים בטוחים (0 פשיטות, 0 היתקעויות), ואז לפי רווח.</p>';
-  h+='<div class="rtable-wrap"><table class="rtable"><tr><th>#</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>יחס</th><th>מאוזנות</th><th>רווח</th><th>תפיסות</th><th>נתקע</th><th>פשיטות</th><th>סונן</th></tr>';
-  res.slice(0,15).forEach(function(r,i){
-    var safe=r.se===0&&r.bu===0;
-    h+='<tr><td>'+(i+1)+'</td><td class="sea">'+r.t+'</td><td>'+r.ml+'</td><td>'+tmLbl[r.tm]+'</td><td>'+odLbl[r.od]+'</td><td>'+(r.bl?"כן":"—")+'</td>'+
-       '<td class="'+(r.pl>=0?"":"hot")+'" style="'+(safe&&r.pl>0?"color:#3dd68c;font-weight:800":"")+'">'+(r.pl>=0?"+":"")+fmt(r.pl)+'</td>'+
-       '<td>'+r.cy+'</td><td class="'+(r.se>0?"hot":"")+'">'+r.se+'</td><td class="'+(r.bu>0?"hot":"")+'">'+r.bu+'</td><td class="'+(r.mc>0?"hot":"")+'">'+r.mc+'</td></tr>';
-  });
-  h+='</table></div>';
-  h+='<div class="risknote">🧭 <strong>איך להשתמש בזה נכון (שלב 3 שלך):</strong> שילוב שמנצח כאן עדיין לא הוכיח כלום — כשבודקים 45 שילובים, כמה תמיד "ינצחו" במקרה. קח את 2–3 המובילים, החלף ליגה או עונה בתפריט למעלה, והרץ שוב. שילוב אמיתי ישרוד את המעבר; שילוב מקרי יקרוס. המסנן "3 המובילות" נקבע לפי הטבלה הסופית של <strong>העונה הקודמת</strong> — מידע שבאמת היה ידוע מראש. לכן העונה הראשונה בנתונים משמשת רק כבסיס לזיהוי המובילות, והמסנן פעיל מהעונה השנייה ואילך. במצב "רק 3 המובילות" מהמרים רק על קבוצות שסיימו בטופ־3 בעונה שלפני — שם היחס לתיקו בדרך כלל גבוה יותר.</div>';
-  out.innerHTML=h;
+    var tmLbl={all:"כל הקבוצות",excl2:"בלי 2 מוב",excl3:"בלי 3 מוב",excl4:"בלי 4 מוב",only2:"רק 2 מוב",only3:"רק 3 מוב",only4:"רק 4 מוב"};
+    var odLbl={any:"הכל",low3:"3.0–3.1",sweet:"3.0–3.3",high:"3.3–3.8"};
+    var h='<p class="lead" style="margin-top:14px">נבדקו <strong>'+res.length.toLocaleString()+'</strong> שילובים על '+entries.length+' קבוצות־עונה. מדורג: קודם שילובים בטוחים (0 פשיטות, 0 היתקעויות), ואז לפי רווח.</p>';
+    h+='<div class="rtable-wrap"><table class="rtable"><tr><th>#</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>יחס</th><th>מאוזנות</th><th>רווח</th><th>תפיסות</th><th>נתקע</th><th>פשיטות</th><th>סונן</th></tr>';
+    res.slice(0,20).forEach(function(r,i){
+      var safe=r.se===0&&r.bu===0;
+      h+='<tr><td>'+(i+1)+'</td><td class="sea">'+r.t+'</td><td>'+r.ml+'</td><td>'+tmLbl[r.tm]+'</td><td>'+odLbl[r.od]+'</td><td>'+(r.bl?"כן":"—")+'</td>'+
+         '<td class="'+(r.pl>=0?"":"hot")+'" style="'+(safe&&r.pl>0?"color:#3dd68c;font-weight:800":"")+'">'+( r.pl>=0?"+":"")+fmt(r.pl)+'</td>'+
+         '<td>'+r.cy+'</td><td class="'+(r.se>0?"hot":"")+'">' +r.se+'</td><td class="'+(r.bu>0?"hot":"")+'">' +r.bu+'</td><td class="'+(r.mc>0?"hot":"")+'">' +r.mc+'</td></tr>';
+    });
+    h+='</table></div>';
+    h+='<div class="risknote">🧭 <strong>איך להשתמש בזה נכון (שלב 3 שלך):</strong> שילוב שמנצח כאן עדיין לא הוכיח כלום. קח את 2–3 המובילים, החלף ליגה או עונה בתפריט למעלה, והרץ שוב. שילוב אמיתי ישרוד את המעבר; שילוב מקרי יקרוס. המסנן נקבע לפי הטבלה הסופית של <strong>העונה הקודמת</strong>.</div>';
+    out.innerHTML=h;
+  }
+  setTimeout(runChunk,0);
 }
 
 /* ===== קישור אירועים ===== */
