@@ -66,7 +66,7 @@
   .vseason{font-family:'Rubik';font-weight:700;font-size:13.5px;grid-column:1;}
   .vg{color:#a8c0b3;grid-column:1;font-size:12px;}
   .vstreak{color:#f2b705;grid-column:1;font-size:11.5px;}
-  .vflag{font-weight:600;font-size:12px;grid-column:2;grid-row:1/4;align-self:center;text-align:right;}
+  .vflag{font-weight:600;font-size:12px;grid-column:2;grid-row:1/5;align-self:center;text-align:right;}
   .vflag.ok{color:#3dd68c;} .vflag.warn{color:#f2b705;}
   .selects,.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;}
   .field{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:#a8c0b3;}
@@ -540,33 +540,95 @@ function updateDataInfo(){
     '<button class="clear" id="clearBtn">🗑 נקה הכל</button></div>';
   el("clearBtn").onclick=function(){ state.matches=[]; state.sources=[]; state.team=""; state.leagueFilter="ALL"; state.seasonFilter="ALL"; el("fetchMsg").innerHTML=""; afterData(); };
   // אימות
+  // שלב 1: אסוף נתונים לפי ליגה+עונה
   var by={}; state.matches.forEach(function(m){ var k=m.league+" · "+m.season;
-    by[k]=by[k]||{games:0,draws:0,teams:{},teamMatches:{}}; by[k].games++; if(m.isDraw)by[k].draws++;
+    by[k]=by[k]||{games:0,draws:0,teams:{},teamMatches:{},teamPts:{}}; by[k].games++; if(m.isDraw)by[k].draws++;
     by[k].teams[m.home]=1; by[k].teams[m.away]=1;
+    // נקודות לטבלה
+    by[k].teamPts[m.home]=by[k].teamPts[m.home]||0;
+    by[k].teamPts[m.away]=by[k].teamPts[m.away]||0;
+    if(m.result==="H"){ by[k].teamPts[m.home]+=3; }
+    else if(m.result==="A"){ by[k].teamPts[m.away]+=3; }
+    else { by[k].teamPts[m.home]+=1; by[k].teamPts[m.away]+=1; }
     [m.home, m.away].forEach(function(t){
       by[k].teamMatches[t]=by[k].teamMatches[t]||[];
-      by[k].teamMatches[t].push(m.isDraw);
+      by[k].teamMatches[t].push({isDraw:m.isDraw, team:t});
     });
   });
+
+  // שלב 2: בנה מפתח ליגה → 4 מובילות לפי עונה
+  // key: league+"|"+season → Set of top4 team names
+  var top4map = {};
+  // אסוף עונות לפי ליגה
+  var leagueSeasons = {};
+  Object.keys(by).forEach(function(k){
+    var parts=k.split(" · "); var league=parts[0], season=parts[1];
+    leagueSeasons[league]=leagueSeasons[league]||[];
+    leagueSeasons[league].push(season);
+  });
+  // לכל ליגה+עונה: חשב מי 4 המובילות
+  // אם יש עונה קודמת בנתונים — קח משם; אחרת קח מאותה עונה
+  Object.keys(leagueSeasons).forEach(function(league){
+    var seasons=leagueSeasons[league].sort();
+    seasons.forEach(function(season, idx){
+      var srcSeason = idx>0 ? seasons[idx-1] : season; // עונה קודמת אם קיימת, אחרת אותה עונה
+      var srcKey = league+" · "+srcSeason;
+      var pts = by[srcKey] ? by[srcKey].teamPts : {};
+      var sorted = Object.keys(pts).sort(function(a,b){ return pts[b]-pts[a]; });
+      var top4 = {}; sorted.slice(0,4).forEach(function(t){ top4[t]=1; });
+      top4map[league+"|"+season] = top4;
+    });
+  });
+
   var keys=Object.keys(by).sort();
   var vh='<div class="verify"><div class="verify-h">ℹ️ אימות שלמות הנתונים</div>';
   keys.forEach(function(k){
     var v=by[k], nt=Object.keys(v.teams).length, exp=nt>0?nt*(nt-1):0, comp=exp>0&&v.games===exp;
+    var parts=k.split(" · "); var league=parts[0], season=parts[1];
+    var top4 = top4map[league+"|"+season] || {};
+    var top4names = Object.keys(top4);
+    var hasTop4 = top4names.length===4;
+
+    // חישוב רצפים כללי
     var maxStreak=0, streaksOver10=0;
     Object.keys(v.teamMatches).forEach(function(team){
       var arr=v.teamMatches[team], cur=0;
-      arr.forEach(function(isDraw){
-        if(!isDraw){ cur++; if(cur>maxStreak) maxStreak=cur; }
+      arr.forEach(function(e){
+        if(!e.isDraw){ cur++; if(cur>maxStreak) maxStreak=cur; }
         else { if(cur>10) streaksOver10++; cur=0; }
       });
       if(cur>10) streaksOver10++;
       if(cur>maxStreak) maxStreak=cur;
     });
     var drawPct = v.games>0 ? Math.round(v.draws/v.games*100) : 0;
+
+    // חישוב רצף ואחוז תיקו בלי 4 מובילות
+    var maxStreakNo4=0, drawsNo4=0, gamesNo4=0;
+    if(hasTop4){
+      Object.keys(v.teamMatches).forEach(function(team){
+        if(top4[team]) return; // דלג על מובילות
+        var arr=v.teamMatches[team], cur=0;
+        arr.forEach(function(e){
+          gamesNo4++;
+          if(e.isDraw) drawsNo4++;
+          if(!e.isDraw){ cur++; if(cur>maxStreakNo4) maxStreakNo4=cur; }
+          else { cur=0; }
+        });
+        if(cur>maxStreakNo4) maxStreakNo4=cur;
+      });
+      // חלק ב-2 כי כל משחק נספר פעמיים (home+away)
+      gamesNo4 = Math.round(gamesNo4/2);
+      drawsNo4 = Math.round(drawsNo4/2);
+    }
+    var drawPctNo4 = gamesNo4>0 ? Math.round(drawsNo4/gamesNo4*100) : 0;
+
     vh+='<div class="vrow">'+
       '<span class="vseason">'+esc(k)+'</span>'+
-      '<span class="vg">'+v.games+' משחקים · '+nt+' קבוצות · '+v.draws+' תיקו ('+drawPct+'%)</span>'+
+      '<span class="vg">כלל: '+v.games+' משחקים · '+nt+' קבוצות · '+v.draws+' תיקו ('+drawPct+'%)</span>'+
       '<span class="vstreak">🔴 רצף מקסימלי: '+maxStreak+' משחקים · רצפים מעל 10: '+streaksOver10+'</span>'+
+      (hasTop4 ?
+        '<span class="vg" style="color:#3dd68c">🟢 בלי 4 מובילות ('+top4names.join(", ")+'): '+gamesNo4+' משחקים · '+drawsNo4+' תיקו ('+drawPctNo4+'%) · רצף מקסימלי: '+maxStreakNo4+'</span>'
+        : '') +
       '<span class="vflag '+(comp?"ok":"warn")+'">'+( comp?"✔ עונה מלאה":"⚠ צפוי "+(exp||"?"))+'</span></div>';
   });
   vh+='</div>'; el("verify").innerHTML=vh;
