@@ -1,0 +1,46 @@
+name: Fetch Football Data
+
+on:
+  schedule:
+    # Every day at 06:00 UTC (09:00 Israel time)
+    - cron: '0 6 * * *'
+  workflow_dispatch:  # Allow manual trigger from GitHub UI
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fetch CSV files from football-data.co.uk
+        run: |
+          mkdir -p data
+          FILES=(
+            "2324/E0.csv:data/E0_2324.csv"
+            "2324/SP1.csv:data/SP1_2324.csv"
+            "2324/I1.csv:data/I1_2324.csv"
+            "2425/E0.csv:data/E0_2425.csv"
+            "2425/SP1.csv:data/SP1_2425.csv"
+            "2425/I1.csv:data/I1_2425.csv"
+          )
+          for ENTRY in "${FILES[@]}"; do
+            SRC="${ENTRY%%:*}"
+            DST="${ENTRY##*:}"
+            echo "Fetching $SRC -> $DST"
+            curl -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+              "https://www.football-data.co.uk/mmz4281/$SRC" -o "$DST" || echo "Failed: $SRC"
+          done
+          ls -lh data/
+
+      - name: Commit and push if data changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Auto-update football data $(date +'%Y-%m-%d')"
+            git push
+          fi
