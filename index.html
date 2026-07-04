@@ -154,11 +154,13 @@
   <!-- 01 נתונים -->
   <section class="card">
     <div class="chead"><span class="num">01</span><h2>נתונים</h2></div>
+
     <div class="actions">
       <button class="btn primary" id="autoBtn">☁️ טען נתונים (25 קבצים — 5 ליגות × 5 עונות)</button>
       <button class="btn" id="demoBtn">🧪 נתוני הדגמה</button>
     </div>
     <div id="fetchMsg"></div>
+
     <div id="loadedInfo"></div>
     <div id="verify"></div>
   </section>
@@ -188,6 +190,8 @@
       <label class="field"><span>תקרה להימור (₪)</span><input id="capIn" type="number" min="1" value="5000" /></label>
       <label class="field"><span>אל תתחיל רצף כשנשארו פחות מ־</span><input id="minLeftIn" type="number" min="0" max="20" value="0" /></label>
       <label class="field"><span>התחשב בגבולות עונה</span><select id="seasonAwareSel"><option value="1">כן (מומלץ)</option><option value="0">לא</option></select></label>
+      <label class="field"><span>המר רק כשיחס התיקו</span><select id="oddsRangeSel"><option value="any">כל יחס</option><option value="sweet">3.0–3.3 (אזור מתוק)</option><option value="high">3.3–3.8 (פרמיה)</option></select></label>
+      <label class="field"><span>רק קבוצות מאוזנות</span><select id="balancedSel"><option value="0">לא</option><option value="1">כן (יחסי 1/2 קרובים)</option></select></label>
     </div>
     <div class="thresh">
       <div class="thresh-l" id="threshLbl"></div>
@@ -227,6 +231,8 @@
 /* ===== קבועים ===== */
 var LEAGUE_MAP = { E0:"אנגליה — Premier League", SP1:"ספרד — La Liga", I1:"איטליה — Serie A", D1:"גרמניה — Bundesliga", F1:"צרפת — Ligue 1" };
 var DRAW_ODDS_COLS = ["AvgD","B365D","PSD","PSCD","BbAvD","IWD","WHD","VCD","MaxD"];
+var HOME_ODDS_COLS = ["AvgH","B365H","PSH","PSCH","BbAvH","IWH","WHH","VCH","MaxH"];
+var AWAY_ODDS_COLS = ["AvgA","B365A","PSA","PSCA","BbAvA","IWA","WHA","VCA","MaxA"];
 var BASE_DATA_URL = 'https://cohenor28-cmd.github.io/drawlab/data/';
 var TARGET_FILES = [
   {season:"2020/21", url:BASE_DATA_URL+"E0_2021.csv",   label:"אנגליה 20/21"},
@@ -258,7 +264,7 @@ var TARGET_FILES = [
 
 /* ===== state ===== */
 var state = { matches:[], sources:[], team:"", leagueFilter:"ALL", seasonFilter:"ALL",
-  base:10, fixedOdds:3, oddsMode:"fixed", threshold:0, cap:5000, minGamesLeft:0, seasonAware:true };
+  base:10, fixedOdds:3, oddsMode:"fixed", threshold:0, cap:5000, minGamesLeft:0, seasonAware:true, oddsRange:"any", balanced:false };
 var storageOK = true;
 
 /* ===== עזרים ===== */
@@ -330,12 +336,15 @@ function normalizeRows(rows){
     }
     var drawOdds=null; var ro=pick(row,["DrawOdds","יחס תיקו"].concat(DRAW_ODDS_COLS));
     if(ro!==undefined){ var n=Number(ro); if(!isNaN(n)&&n>1) drawOdds=n; }
+    var homeOdds=null, awayOdds=null;
+    var rh=pick(row,HOME_ODDS_COLS); if(rh!==undefined){ var nh=Number(rh); if(!isNaN(nh)&&nh>1) homeOdds=nh; }
+    var ra=pick(row,AWAY_ODDS_COLS); if(ra!==undefined){ var na=Number(ra); if(!isNaN(na)&&na>1) awayOdds=na; }
     var div=pick(row,["Div","League","ליגה"]); var league=LEAGUE_MAP[div]||div||"לא ידוע";
     var season=pick(row,["Season","עונה"])||seasonLabel(date);
     out.push({ ms: date?date.getTime():null,
       dateStr: date?date.toLocaleDateString("he-IL"):String(dateRaw||""),
       home:String(home).trim(), away:String(away).trim(),
-      hg:hg, ag:ag, result:result, isDraw:result==="D", drawOdds:drawOdds, league:league, season:season });
+      hg:hg, ag:ag, result:result, isDraw:result==="D", drawOdds:drawOdds, homeOdds:homeOdds, awayOdds:awayOdds, league:league, season:season });
   }
   return out;
 }
@@ -374,7 +383,7 @@ function simulate(seq, o){
   var sizes={}; seq.forEach(function(m){ sizes[m.season]=(sizes[m.season]||0)+1; });
   var seen={}, remainAfter=new Array(seq.length);
   for(var q=0;q<seq.length;q++){ var sq=seq[q].season; seen[sq]=(seen[sq]||0)+1; remainAfter[q]=sizes[sq]-seen[sq]; }
-  var noDraw=0, betting=false, stake=o.base, pl=0, maxStake=0, busts=0, cyclesWon=0, lr=0, mlr=0, seasonEndBusts=0, equity=[];
+  var noDraw=0, betting=false, stake=o.base, pl=0, maxStake=0, busts=0, cyclesWon=0, lr=0, mlr=0, seasonEndBusts=0, missedCatches=0, equity=[];
   for(var i=0;i<seq.length;i++){
     var m=seq[i];
     if(seasonAware && i>0 && seq[i].season!==seq[i-1].season){
@@ -382,9 +391,16 @@ function simulate(seq, o){
       betting=false; stake=o.base; lr=0; noDraw=0;
     }
     var odds = o.oddsMode==="real" ? (m.drawOdds||o.fixedOdds) : o.fixedOdds;
-    if(!betting && noDraw>=o.threshold && remainAfter[i]>=minLeft){ betting=true; stake=o.base; }
+    var eligible=true;
+    if(o.oddsLo){ eligible = !!(m.drawOdds && m.drawOdds>=o.oddsLo && m.drawOdds<=o.oddsHi); }
+    if(eligible && o.balanced){
+      eligible = !!(m.homeOdds && m.awayOdds && Math.max(m.homeOdds,m.awayOdds)/Math.min(m.homeOdds,m.awayOdds) <= 1.45);
+    }
+    if(!betting && noDraw>=o.threshold && remainAfter[i]>=minLeft && eligible){ betting=true; stake=o.base; }
     if(betting){
-      if(stake>o.cap){ busts++; betting=false; stake=o.base; lr=0; }
+      if(!eligible){
+        if(m.isDraw){ missedCatches++; betting=false; stake=o.base; lr=0; }
+      } else if(stake>o.cap){ busts++; betting=false; stake=o.base; lr=0; }
       else {
         if(stake>maxStake) maxStake=stake;
         if(m.isDraw){ pl += stake*(odds-1); cyclesWon++; betting=false; stake=o.base; lr=0; }
@@ -395,8 +411,9 @@ function simulate(seq, o){
     noDraw = m.isDraw ? 0 : noDraw+1;
   }
   if(seasonAware && betting){ seasonEndBusts++; }
-  return { pl:pl, maxStake:maxStake, busts:busts, cyclesWon:cyclesWon, maxLosingRun:mlr, seasonEndBusts:seasonEndBusts, equity:equity };
+  return { pl:pl, maxStake:maxStake, busts:busts, cyclesWon:cyclesWon, maxLosingRun:mlr, seasonEndBusts:seasonEndBusts, missedCatches:missedCatches, equity:equity };
 }
+function oddsRangeOf(key){ return key==="sweet"?[3.0,3.3]:key==="high"?[3.3,3.8]:null; }
 
 /* ===== גרפים SVG (אופליין) ===== */
 function svgBars(items, opts){
@@ -440,7 +457,7 @@ function saveState(){
   try{
     localStorage.setItem("drawlab_data", JSON.stringify({ matches:state.matches, sources:state.sources }));
     localStorage.setItem("drawlab_set", JSON.stringify({ base:state.base, fixedOdds:state.fixedOdds,
-      oddsMode:state.oddsMode, threshold:state.threshold, cap:state.cap, minGamesLeft:state.minGamesLeft, seasonAware:state.seasonAware, team:state.team,
+      oddsMode:state.oddsMode, threshold:state.threshold, cap:state.cap, minGamesLeft:state.minGamesLeft, seasonAware:state.seasonAware, oddsRange:state.oddsRange, balanced:state.balanced, team:state.team,
       leagueFilter:state.leagueFilter, seasonFilter:state.seasonFilter }));
   }catch(e){ storageOK=false; el("storageNote").textContent="שים לב: הדפדפן חוסם שמירה מקומית, אז הנתונים יישמרו רק לפגישה הזו."; }
 }
@@ -449,7 +466,7 @@ function loadState(){
     var d=localStorage.getItem("drawlab_data");
     if(d){ var o=JSON.parse(d); state.matches=o.matches||[]; state.sources=o.sources||[]; }
     var st=localStorage.getItem("drawlab_set");
-    if(st){ var s=JSON.parse(st); ["base","fixedOdds","oddsMode","threshold","cap","minGamesLeft","seasonAware","team","leagueFilter","seasonFilter"].forEach(function(k){ if(s[k]!==undefined) state[k]=s[k]; }); }
+    if(st){ var s=JSON.parse(st); ["base","fixedOdds","oddsMode","threshold","cap","minGamesLeft","seasonAware","oddsRange","balanced","team","leagueFilter","seasonFilter"].forEach(function(k){ if(s[k]!==undefined) state[k]=s[k]; }); }
   }catch(e){ storageOK=false; }
 }
 
@@ -486,8 +503,8 @@ function autoFetch(){
     btn.disabled=false; btn.innerHTML='☁️ טען נתונים (25 קבצים — 5 ליגות × 5 עונות)';
     var m=el("fetchMsg");
     if(fail===0) m.innerHTML='<div class="fmsg ok">✅ כל '+ok+' הקבצים נטענו בהצלחה.</div>';
-    else if(ok>0) m.innerHTML='<div class="fmsg warn">⚠️ '+ok+' נטענו, '+fail+' נכשלו. נסה שוב.</div>';
-    else m.innerHTML='<div class="fmsg err">⚠️ טעינת הנתונים נכשלה — בדוק חיבור לאינטרנט ונסה שוב.</div>';
+    else if(ok>0) m.innerHTML='<div class="fmsg warn">⚠️ '+ok+' נטענו, '+fail+' נכשלו. רענן את הדף ונסה שוב.</div>';
+    else m.innerHTML='<div class="fmsg err">❌ הטעינה נכשלה — רענן את הדף ונסה שוב.</div>';
     afterData();
   }
   next();
@@ -526,7 +543,6 @@ function updateDataInfo(){
   var by={}; state.matches.forEach(function(m){ var k=m.league+" · "+m.season;
     by[k]=by[k]||{games:0,draws:0,teams:{},teamMatches:{}}; by[k].games++; if(m.isDraw)by[k].draws++;
     by[k].teams[m.home]=1; by[k].teams[m.away]=1;
-    // אסוף משחקים לפי קבוצה לחישוב רצפים
     [m.home, m.away].forEach(function(t){
       by[k].teamMatches[t]=by[k].teamMatches[t]||[];
       by[k].teamMatches[t].push(m.isDraw);
@@ -536,7 +552,6 @@ function updateDataInfo(){
   var vh='<div class="verify"><div class="verify-h">ℹ️ אימות שלמות הנתונים</div>';
   keys.forEach(function(k){
     var v=by[k], nt=Object.keys(v.teams).length, exp=nt>0?nt*(nt-1):0, comp=exp>0&&v.games===exp;
-    // חישוב רצפים לפי קבוצה
     var maxStreak=0, streaksOver10=0;
     Object.keys(v.teamMatches).forEach(function(team){
       var arr=v.teamMatches[team], cur=0;
@@ -639,6 +654,7 @@ function updateThreshLbl(){
 
 function renderSimSweep(stats){
   var o={ threshold:state.threshold, base:state.base, oddsMode:state.oddsMode, fixedOdds:state.fixedOdds, cap:state.cap, minGamesLeft:state.minGamesLeft, seasonAware:state.seasonAware };
+  var _r=oddsRangeOf(state.oddsRange); if(_r){ o.oddsLo=_r[0]; o.oddsHi=_r[1]; } o.balanced=state.balanced;
   var sim=simulate(stats.seq, o);
   var sk=function(l,v,c){ return '<div class="simkpi '+(c||"")+'"><div class="simkpi-v">'+v+'</div><div class="simkpi-l">'+l+'</div></div>'; };
   var h='<div class="simkpis">'+
@@ -647,13 +663,15 @@ function renderSimSweep(stats){
     sk("ההימור הכי גדול",fmt(sim.maxStake)+" ₪","warn")+
     sk("רצף הפסדים ארוך",fmt(sim.maxLosingRun),"warn")+
     sk("חצית את התקרה",fmt(sim.busts),sim.busts>0?"danger":"good")+
-    sk("נתקע בסוף עונה",fmt(sim.seasonEndBusts),sim.seasonEndBusts>0?"danger":"good")+'</div>';
+    sk("נתקע בסוף עונה",fmt(sim.seasonEndBusts),sim.seasonEndBusts>0?"danger":"good")+
+    (sim.missedCatches>0? sk("תיקו שסונן החוצה",fmt(sim.missedCatches),"danger") : "")+'</div>';
   if(sim.busts>0) h+='<div class="alert">⚠️ בסף הזה חצית את תקרת ההימור '+sim.busts+' פעמים — בפועל נגמר לך הכסף. הרווח שמוצג מתעלם מכך שאחרי פשיטת רגל אין המשך.</div>';
   if(sim.seasonEndBusts>0) h+='<div class="alert">⏳ '+sim.seasonEndBusts+' פעמים נתקעת ברצף שלא נתפס עד סוף העונה — הפסד נעול. נסה להעלות את "אל תתחיל רצף כשנשארו פחות מ־".</div>';
+  if(sim.missedCatches>0) h+='<div class="alert">🕳️ '+sim.missedCatches+' פעמים המסנן פסל משחק באמצע רצף — ודווקא בו נפל התיקו. ההפסדים שנצברו נשארו בלי תפיסה. זה המחיר הנסתר של מסנן לפי־משחק בשיטת רדיפה.</div>';
   h+='<div class="chart-t">עקומת ההון לאורך המשחקים (₪ מצטבר)</div><div class="chart">'+svgLine(sim.equity,{h:200})+'</div>';
   el("simOut").innerHTML=h;
   // סורק
-  var sweep=[]; for(var t=0;t<=10;t++){ var r=simulate(stats.seq,{threshold:t,base:state.base,oddsMode:state.oddsMode,fixedOdds:state.fixedOdds,cap:state.cap,minGamesLeft:state.minGamesLeft,seasonAware:state.seasonAware}); sweep.push({t:t,pl:Math.round(r.pl),busts:r.busts,se:r.seasonEndBusts}); }
+  var sweep=[]; for(var t=0;t<=10;t++){ var r=simulate(stats.seq,{threshold:t,base:state.base,oddsMode:state.oddsMode,fixedOdds:state.fixedOdds,cap:state.cap,minGamesLeft:state.minGamesLeft,seasonAware:state.seasonAware,oddsLo:o.oddsLo,oddsHi:o.oddsHi,balanced:o.balanced}); sweep.push({t:t,pl:Math.round(r.pl),busts:r.busts,se:r.seasonEndBusts}); }
   var safe=sweep.filter(function(s){return s.busts===0&&s.se===0;}); var pool=safe.length?safe:sweep;
   var best=pool.reduce(function(a,b){return b.pl>a.pl?b:a;});
   var sh='<div class="chead"><span class="num">05</span><h2>מאיזה משחק ברצף הכי משתלם?</h2></div>';
@@ -661,7 +679,7 @@ function renderSimSweep(stats){
   sh+='<div class="best '+(best.pl>=0?"good":"bad")+'">'+(best.pl>=0?"📈":"📉")+' הכי טוב: להתחיל אחרי <strong>'+best.t+'</strong> משחקים ללא תיקו → <strong>'+(best.pl>=0?"+":"")+fmt(best.pl)+' ₪</strong>'+(best.busts>0?'<span class="best-w"> (עם '+best.busts+' פשיטות רגל — לא בר־ביצוע)</span>':'')+'</div>';
   sh+='<div class="chart">'+svgBars(sweep.map(function(d){return {label:d.t, value:d.pl, color:(d.busts>0||d.se>0)?"#e5484d":(d.pl>=0?"#3dd68c":"#c98a2b"), title:"סף "+d.t+": "+fmt(d.pl)+" ₪"+(d.busts?" · "+d.busts+" פשיטות רגל":"")+(d.se?" · "+d.se+" נתקעו בסוף עונה":"")};}),{h:220})+'</div>';
   sh+='<div class="sweep-leg"><span><i style="background:#3dd68c"></i> רווחי ובטוח</span><span><i style="background:#c98a2b"></i> מפסיד</span><span><i style="background:#e5484d"></i> סיכון (פשיטת רגל/היתקעות)</span></div>';
-  var cut=[]; for(var c2=0;c2<=8;c2++){ var rc=simulate(stats.seq,{threshold:state.threshold,base:state.base,oddsMode:state.oddsMode,fixedOdds:state.fixedOdds,cap:state.cap,minGamesLeft:c2,seasonAware:true}); cut.push({c:c2,pl:Math.round(rc.pl),se:rc.seasonEndBusts,busts:rc.busts}); }
+  var cut=[]; for(var c2=0;c2<=8;c2++){ var rc=simulate(stats.seq,{threshold:state.threshold,base:state.base,oddsMode:state.oddsMode,fixedOdds:state.fixedOdds,cap:state.cap,minGamesLeft:c2,seasonAware:true,oddsLo:o.oddsLo,oddsHi:o.oddsHi,balanced:o.balanced}); cut.push({c:c2,pl:Math.round(rc.pl),se:rc.seasonEndBusts,busts:rc.busts}); }
   var cutSafe=cut.filter(function(s){return s.se===0&&s.busts===0;}); var cutPool=cutSafe.length?cutSafe:cut;
   var bestCut=cutPool.reduce(function(a,b){return b.pl>a.pl?b:a;});
   sh+='<div class="chead" style="margin-top:26px"><span class="num">06</span><h2>כמה משחקים לפני סוף העונה להפסיק?</h2></div>';
@@ -763,32 +781,36 @@ function runLab(){
         seq: ms.filter(function(m){return m.home===t||m.away===t;}) });
     });
   });
-  var TH=[0,2,3,4,5], ML=[0,3,5], TM=["all","excl","delay","only"], res=[];
-  TM.forEach(function(tm){ ML.forEach(function(ml){ TH.forEach(function(t){
-    var pl=0, cy=0, se=0, bu=0, mx=0;
+  var TH=[0,2,3,4,5], ML=[0,3,5], TM=["all","excl","delay","only"], OD=["any","sweet","high"], BL=[false,true], res=[];
+  BL.forEach(function(bl){ OD.forEach(function(od){ TM.forEach(function(tm){ ML.forEach(function(ml){ TH.forEach(function(t){
+    var rng=oddsRangeOf(od);
+    var pl=0, cy=0, se=0, bu=0, mx=0, mc=0;
     entries.forEach(function(e){
       if(tm==="excl" && e.isTop) return;
       if(tm==="only" && !(e.isTop && e.topKnown)) return;
       var th = t + (tm==="delay" && e.isTop ? 3 : 0);
-      var r=simulate(e.seq,{threshold:th, base:state.base, oddsMode:state.oddsMode,
-        fixedOdds:state.fixedOdds, cap:state.cap, minGamesLeft:ml, seasonAware:true});
-      pl+=r.pl; cy+=r.cyclesWon; se+=r.seasonEndBusts; bu+=r.busts; if(r.maxStake>mx)mx=r.maxStake;
+      var opts={threshold:th, base:state.base, oddsMode:state.oddsMode,
+        fixedOdds:state.fixedOdds, cap:state.cap, minGamesLeft:ml, seasonAware:true, balanced:bl};
+      if(rng){ opts.oddsLo=rng[0]; opts.oddsHi=rng[1]; }
+      var r=simulate(e.seq,opts);
+      pl+=r.pl; cy+=r.cyclesWon; se+=r.seasonEndBusts; bu+=r.busts; mc+=r.missedCatches; if(r.maxStake>mx)mx=r.maxStake;
     });
-    res.push({t:t,ml:ml,tm:tm,pl:Math.round(pl),cy:cy,se:se,bu:bu,mx:mx});
-  });});});
+    res.push({t:t,ml:ml,tm:tm,od:od,bl:bl,pl:Math.round(pl),cy:cy,se:se,bu:bu,mc:mc,mx:mx});
+  });});});});});
   res.sort(function(a,b){
     var sa=(a.se===0&&a.bu===0)?1:0, sb=(b.se===0&&b.bu===0)?1:0;
     if(sa!==sb) return sb-sa;
     return b.pl-a.pl;
   });
-  var tmLbl={all:"רגיל",excl:"בלי 3 המובילות",delay:"מובילות: סף +3",only:"רק 3 המובילות"};
-  var h='<p class="lead" style="margin-top:14px">נבדקו '+res.length+' שילובים על '+entries.length+' קבוצות־עונה. מדורג: קודם שילובים בטוחים (0 פשיטות, 0 היתקעויות), ואז לפי רווח.</p>';
-  h+='<table class="rtable"><tr><th>#</th><th>סף</th><th>עצירה לפני סוף</th><th>3 מובילות</th><th>רווח</th><th>תפיסות</th><th>נתקע</th><th>פשיטות</th></tr>';
-  res.slice(0,12).forEach(function(r,i){
+  var tmLbl={all:"רגיל",excl:"בלי מובילות",delay:"מובילות +3",only:"רק מובילות"};
+  var odLbl={any:"הכל",sweet:"3.0–3.3",high:"3.3–3.8"};
+  var h='<p class="lead" style="margin-top:14px">נבדקו '+res.length+' שילובים (כולל מסנני יחס ואיזון) על '+entries.length+' קבוצות־עונה. מדורג: קודם שילובים בטוחים (0 פשיטות, 0 היתקעויות), ואז לפי רווח.</p>';
+  h+='<table class="rtable"><tr><th>#</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>יחס</th><th>מאוזנות</th><th>רווח</th><th>תפיסות</th><th>נתקע</th><th>פשיטות</th><th>סונן</th></tr>';
+  res.slice(0,15).forEach(function(r,i){
     var safe=r.se===0&&r.bu===0;
-    h+='<tr><td>'+(i+1)+'</td><td class="sea">'+r.t+'</td><td>'+r.ml+'</td><td>'+tmLbl[r.tm]+'</td>'+
+    h+='<tr><td>'+(i+1)+'</td><td class="sea">'+r.t+'</td><td>'+r.ml+'</td><td>'+tmLbl[r.tm]+'</td><td>'+odLbl[r.od]+'</td><td>'+(r.bl?"כן":"—")+'</td>'+
        '<td class="'+(r.pl>=0?"":"hot")+'" style="'+(safe&&r.pl>0?"color:#3dd68c;font-weight:800":"")+'">'+(r.pl>=0?"+":"")+fmt(r.pl)+'</td>'+
-       '<td>'+r.cy+'</td><td class="'+(r.se>0?"hot":"")+'">'+r.se+'</td><td class="'+(r.bu>0?"hot":"")+'">'+r.bu+'</td></tr>';
+       '<td>'+r.cy+'</td><td class="'+(r.se>0?"hot":"")+'">'+r.se+'</td><td class="'+(r.bu>0?"hot":"")+'">'+r.bu+'</td><td class="'+(r.mc>0?"hot":"")+'">'+r.mc+'</td></tr>';
   });
   h+='</table>';
   h+='<div class="risknote">🧭 <strong>איך להשתמש בזה נכון (שלב 3 שלך):</strong> שילוב שמנצח כאן עדיין לא הוכיח כלום — כשבודקים 45 שילובים, כמה תמיד "ינצחו" במקרה. קח את 2–3 המובילים, החלף ליגה או עונה בתפריט למעלה, והרץ שוב. שילוב אמיתי ישרוד את המעבר; שילוב מקרי יקרוס. המסנן "3 המובילות" נקבע לפי הטבלה הסופית של <strong>העונה הקודמת</strong> — מידע שבאמת היה ידוע מראש. לכן העונה הראשונה בנתונים משמשת רק כבסיס לזיהוי המובילות, והמסנן פעיל מהעונה השנייה ואילך. במצב "רק 3 המובילות" מהמרים רק על קבוצות שסיימו בטופ־3 בעונה שלפני — שם היחס לתיקו בדרך כלל גבוה יותר.</div>';
@@ -809,6 +831,8 @@ function bind(){
   el("threshRange").addEventListener("input", function(e){ state.threshold=Number(e.target.value); updateThreshLbl(); softRefresh(); });
   el("minLeftIn").addEventListener("input", function(e){ state.minGamesLeft=Math.max(0,Number(e.target.value)||0); softRefresh(); });
   el("seasonAwareSel").addEventListener("change", function(e){ state.seasonAware=e.target.value==="1"; softRefresh(); });
+  el("oddsRangeSel").addEventListener("change", function(e){ state.oddsRange=e.target.value; softRefresh(); });
+  el("balancedSel").addEventListener("change", function(e){ state.balanced=e.target.value==="1"; softRefresh(); });
   el("statsFab").addEventListener("click", function(){ renderDrawer(); el("statsDrawer").classList.remove("hidden"); });
   el("drawerClose").addEventListener("click", function(){ el("statsDrawer").classList.add("hidden"); });
   el("statsDrawer").addEventListener("click", function(e){ if(e.target.id==="statsDrawer") el("statsDrawer").classList.add("hidden"); });
@@ -826,6 +850,7 @@ function init(){
   el("baseIn").value=state.base; el("capIn").value=state.cap; el("fixedOddsIn").value=state.fixedOdds;
   el("oddsModeSel").value=state.oddsMode; el("threshRange").value=state.threshold;
   el("minLeftIn").value=state.minGamesLeft; el("seasonAwareSel").value=state.seasonAware?"1":"0";
+  el("oddsRangeSel").value=state.oddsRange; el("balancedSel").value=state.balanced?"1":"0";
   bind();
   afterData();
 }
