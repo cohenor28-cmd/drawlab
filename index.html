@@ -153,23 +153,11 @@
   <!-- 01 נתונים -->
   <section class="card">
     <div class="chead"><span class="num">01</span><h2>נתונים</h2></div>
-    <label class="drop">
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      <span class="up-t">בחר את קובצי ה־CSV מהטלפון</span>
-      <span class="up-s">פתח את תיקיית "הורדות" ובחר את הקבצים (אפשר כמה יחד)</span>
-      <span class="pick">פתח את הקבצים</span>
-      <input id="fileInput" type="file" accept="*/*" multiple hidden />
-    </label>
     <div class="actions">
-      <button class="btn primary" id="autoBtn">☁️ נסה למשוך אוטומטית (6 הקבצים)</button>
+      <button class="btn primary" id="autoBtn">☁️ טען נתונים (25 קבצים — 5 ליגות × 5 עונות)</button>
       <button class="btn" id="demoBtn">🧪 נתוני הדגמה</button>
     </div>
     <div id="fetchMsg"></div>
-    <div class="links">
-      <div class="links-h">⬇️ הורדה ידנית — לחיצה מורידה את הקובץ, ואז בחר אותם עם הכפתור למעלה</div>
-      <div class="links-g" id="linksGrid"></div>
-      <div class="links-n">המקור: football-data.co.uk · כל קובץ כולל תוצאות + יחסי תיקו אמיתיים מהבוקמייקרים.</div>
-    </div>
     <div id="loadedInfo"></div>
     <div id="verify"></div>
   </section>
@@ -240,12 +228,31 @@ var LEAGUE_MAP = { E0:"אנגליה — Premier League", SP1:"ספרד — La Li
 var DRAW_ODDS_COLS = ["AvgD","B365D","PSD","PSCD","BbAvD","IWD","WHD","VCD","MaxD"];
 var BASE_DATA_URL = 'https://cohenor28-cmd.github.io/drawlab/data/';
 var TARGET_FILES = [
-  {season:"2023/24", url:BASE_DATA_URL+"E0_2324.csv",  label:"אנגליה 23/24"},
-  {season:"2023/24", url:BASE_DATA_URL+"SP1_2324.csv", label:"ספרד 23/24"},
-  {season:"2023/24", url:BASE_DATA_URL+"I1_2324.csv",  label:"איטליה 23/24"},
-  {season:"2024/25", url:BASE_DATA_URL+"E0_2425.csv",  label:"אנגליה 24/25"},
-  {season:"2024/25", url:BASE_DATA_URL+"SP1_2425.csv", label:"ספרד 24/25"},
-  {season:"2024/25", url:BASE_DATA_URL+"I1_2425.csv",  label:"איטליה 24/25"}
+  {season:"2020/21", url:BASE_DATA_URL+"E0_2021.csv",   label:"אנגליה 20/21"},
+  {season:"2020/21", url:BASE_DATA_URL+"SP1_2021.csv",  label:"ספרד 20/21"},
+  {season:"2020/21", url:BASE_DATA_URL+"I1_2021.csv",   label:"איטליה 20/21"},
+  {season:"2020/21", url:BASE_DATA_URL+"D1_2021.csv",   label:"גרמניה 20/21"},
+  {season:"2020/21", url:BASE_DATA_URL+"F1_2021.csv",   label:"צרפת 20/21"},
+  {season:"2021/22", url:BASE_DATA_URL+"E0_2122.csv",   label:"אנגליה 21/22"},
+  {season:"2021/22", url:BASE_DATA_URL+"SP1_2122.csv",  label:"ספרד 21/22"},
+  {season:"2021/22", url:BASE_DATA_URL+"I1_2122.csv",   label:"איטליה 21/22"},
+  {season:"2021/22", url:BASE_DATA_URL+"D1_2122.csv",   label:"גרמניה 21/22"},
+  {season:"2021/22", url:BASE_DATA_URL+"F1_2122.csv",   label:"צרפת 21/22"},
+  {season:"2022/23", url:BASE_DATA_URL+"E0_2223.csv",   label:"אנגליה 22/23"},
+  {season:"2022/23", url:BASE_DATA_URL+"SP1_2223.csv",  label:"ספרד 22/23"},
+  {season:"2022/23", url:BASE_DATA_URL+"I1_2223.csv",   label:"איטליה 22/23"},
+  {season:"2022/23", url:BASE_DATA_URL+"D1_2223.csv",   label:"גרמניה 22/23"},
+  {season:"2022/23", url:BASE_DATA_URL+"F1_2223.csv",   label:"צרפת 22/23"},
+  {season:"2023/24", url:BASE_DATA_URL+"E0_2324.csv",   label:"אנגליה 23/24"},
+  {season:"2023/24", url:BASE_DATA_URL+"SP1_2324.csv",  label:"ספרד 23/24"},
+  {season:"2023/24", url:BASE_DATA_URL+"I1_2324.csv",   label:"איטליה 23/24"},
+  {season:"2023/24", url:BASE_DATA_URL+"D1_2324.csv",   label:"גרמניה 23/24"},
+  {season:"2023/24", url:BASE_DATA_URL+"F1_2324.csv",   label:"צרפת 23/24"},
+  {season:"2024/25", url:BASE_DATA_URL+"E0_2425.csv",   label:"אנגליה 24/25"},
+  {season:"2024/25", url:BASE_DATA_URL+"SP1_2425.csv",  label:"ספרד 24/25"},
+  {season:"2024/25", url:BASE_DATA_URL+"I1_2425.csv",   label:"איטליה 24/25"},
+  {season:"2024/25", url:BASE_DATA_URL+"D1_2425.csv",   label:"גרמניה 24/25"},
+  {season:"2024/25", url:BASE_DATA_URL+"F1_2425.csv",   label:"צרפת 24/25"}
 ];
 
 /* ===== state ===== */
@@ -475,11 +482,11 @@ function autoFetch(){
   }
   function finish(){
     if(acc.length) state.matches=mergeMatches(state.matches, acc);
-    btn.disabled=false; btn.innerHTML='☁️ נסה למשוך אוטומטית (6 הקבצים)';
+    btn.disabled=false; btn.innerHTML='☁️ טען נתונים (25 קבצים — 5 ליגות × 5 עונות)';
     var m=el("fetchMsg");
-    if(fail===0) m.innerHTML='<div class="fmsg ok">✅ כל '+ok+' הקבצים נמשכו בהצלחה.</div>';
-    else if(ok>0) m.innerHTML='<div class="fmsg warn">⚠️ '+ok+' נמשכו, '+fail+' נחסמו (CORS). את החסומים הורד ידנית מהלינקים.</div>';
-    else m.innerHTML='<div class="fmsg err">⚠️ המשיכה הישירה נחסמה על ידי האתר (CORS) — נפוץ ולא באשמתך. הורד את הקבצים מהלינקים ובחר אותם עם הכפתור למעלה.</div>';
+    if(fail===0) m.innerHTML='<div class="fmsg ok">✅ כל '+ok+' הקבצים נטענו בהצלחה.</div>';
+    else if(ok>0) m.innerHTML='<div class="fmsg warn">⚠️ '+ok+' נטענו, '+fail+' נכשלו. נסה שוב.</div>';
+    else m.innerHTML='<div class="fmsg err">⚠️ טעינת הנתונים נכשלה — בדוק חיבור לאינטרנט ונסה שוב.</div>';
     afterData();
   }
   next();
@@ -766,8 +773,6 @@ function runLab(){
 
 /* ===== קישור אירועים ===== */
 function bind(){
-  el("linksGrid").innerHTML=TARGET_FILES.map(function(f){ return '<a class="lnk" href="'+f.url+'" target="_blank" rel="noreferrer">⬇ '+esc(f.label)+'</a>'; }).join("");
-  el("fileInput").addEventListener("change", function(e){ ingestFiles(e.target.files); e.target.value=""; });
   el("autoBtn").addEventListener("click", autoFetch);
   el("demoBtn").addEventListener("click", function(){ state.matches=demoData(); state.sources=["נתוני הדגמה (לא אמיתיים)"]; state.team="קבוצת הדגמה"; state.leagueFilter="ALL"; state.seasonFilter="ALL"; afterData(); });
   el("leagueSel").addEventListener("change", function(e){ state.leagueFilter=e.target.value; state.team=""; updateSelects(); refreshResults(); saveState(); });

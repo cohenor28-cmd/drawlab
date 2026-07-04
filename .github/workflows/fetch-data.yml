@@ -17,19 +17,38 @@ jobs:
         run: |
           mkdir -p data
           FILES=(
+            "2021/E0.csv:data/E0_2021.csv"
+            "2021/SP1.csv:data/SP1_2021.csv"
+            "2021/I1.csv:data/I1_2021.csv"
+            "2021/D1.csv:data/D1_2021.csv"
+            "2021/F1.csv:data/F1_2021.csv"
+            "2122/E0.csv:data/E0_2122.csv"
+            "2122/SP1.csv:data/SP1_2122.csv"
+            "2122/I1.csv:data/I1_2122.csv"
+            "2122/D1.csv:data/D1_2122.csv"
+            "2122/F1.csv:data/F1_2122.csv"
+            "2223/E0.csv:data/E0_2223.csv"
+            "2223/SP1.csv:data/SP1_2223.csv"
+            "2223/I1.csv:data/I1_2223.csv"
+            "2223/D1.csv:data/D1_2223.csv"
+            "2223/F1.csv:data/F1_2223.csv"
             "2324/E0.csv:data/E0_2324.csv"
             "2324/SP1.csv:data/SP1_2324.csv"
             "2324/I1.csv:data/I1_2324.csv"
+            "2324/D1.csv:data/D1_2324.csv"
+            "2324/F1.csv:data/F1_2324.csv"
             "2425/E0.csv:data/E0_2425.csv"
             "2425/SP1.csv:data/SP1_2425.csv"
             "2425/I1.csv:data/I1_2425.csv"
+            "2425/D1.csv:data/D1_2425.csv"
+            "2425/F1.csv:data/F1_2425.csv"
           )
           for ENTRY in "${FILES[@]}"; do
             SRC="${ENTRY%%:*}"
             DST="${ENTRY##*:}"
-            echo "Fetching $SRC -> $DST"
+            echo -n "Fetching $SRC -> $DST ... "
             curl -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
-              "https://www.football-data.co.uk/mmz4281/$SRC" -o "$DST" || echo "Failed: $SRC"
+              "https://www.football-data.co.uk/mmz4281/$SRC" -o "$DST" && echo "OK" || echo "FAILED"
           done
           ls -lh data/
 
