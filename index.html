@@ -123,9 +123,10 @@
   .foot{text-align:center;font-size:12px;color:#5f7a6d;margin-top:24px;}
   .hidden{display:none !important;}
   .spin{animation:sp 1s linear infinite;} @keyframes sp{to{transform:rotate(360deg);}}
-  .rtable{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}
-  .rtable th,.rtable td{padding:8px 5px;text-align:center;border-bottom:1px solid #143529;}
-  .rtable th{color:#8fa99b;font-weight:700;font-size:11.5px;}
+  .rtable-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;}
+  .rtable{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px;min-width:480px;}
+  .rtable th,.rtable td{padding:7px 4px;text-align:center;border-bottom:1px solid #143529;white-space:nowrap;}
+  .rtable th{color:#8fa99b;font-weight:700;font-size:11px;}
   .rtable td{color:#c4d6cb;}
   .rtable .sea{font-family:'Rubik';font-weight:700;color:#e8f0ea;}
   .rtable .hot{color:#ff8a5c;font-weight:800;}
@@ -680,7 +681,7 @@ function updateDataInfo(){
     var pa=leagueSummary[a], pb=leagueSummary[b];
     return (pb.draws/pb.games)-(pa.draws/pa.games);
   });
-  vh+='<table class="rtable" style="margin-top:8px"><tr>'+
+  vh+='<div class="rtable-wrap"><table class="rtable" style="margin-top:8px"><tr>'
     '<th>ליגה</th><th>משחקים</th><th>תיקו %</th><th>רצף מקס בינוני</th><th>רצפים>10</th>'+
     '<th>תיקו % בלי מובילות</th><th>רצף מקס בלי מובילות</th></tr>';
   leagueOrder.forEach(function(league){
@@ -699,7 +700,7 @@ function updateDataInfo(){
       '<td>'+avgMaxStreakNo4+'</td>'+
     '</tr>';
   });
-  vh+='</table><p style="font-size:11.5px;color:#5f7a6d;margin-top:8px">🟡 צהוב = אחוז תיקו גבוה במיוחד | 🔴 אדום = רצפים מעל 10 גבוהים | הליגות מדורגות לפי אחוז תיקו יורד</p>';
+  vh+='</table></div><p style="font-size:11.5px;color:#5f7a6d;margin-top:8px">🟡 צהוב = אחוז תיקו גבוה במיוחד | 🔴 אדום = רצפים מעל 10 גבוהים | הליגות מדורגות לפי אחוז תיקו יורד</p>';
 
   vh+='</div>'; el("verify").innerHTML=vh;
 }
@@ -768,11 +769,11 @@ function renderStats(stats){
   }
   if(stats.perSeason && stats.perSeason.length){
     h+='<div class="chart-t">סיכון לפי עונה — הרצף הכי ארוך ללא תיקו, וכמה משחקים ללא תיקו נשארו פתוחים בסוף העונה</div>';
-    h+='<table class="rtable"><tr><th>עונה</th><th>משחקים</th><th>תיקו</th><th>% תיקו</th><th>רצף מקס׳</th><th>נתקע בסוף</th></tr>';
+    h+='<div class="rtable-wrap"><table class="rtable"><tr><th>עונה</th><th>משחקים</th><th>תיקו</th><th>% תיקו</th><th>רצף מקס׳</th><th>נתקע בסוף</th></tr>';
     stats.perSeason.forEach(function(pp){
       h+='<tr><td class="sea">'+esc(pp.season)+'</td><td>'+pp.games+'</td><td>'+pp.draws+'</td><td>'+(pp.drawPct*100).toFixed(0)+'%</td><td class="'+(pp.longest>=8?"hot":"")+'">'+pp.longest+'</td><td class="'+(pp.tail>=5?"hot":"")+'">'+pp.tail+'</td></tr>';
     });
-    h+='</table>';
+    h+='</table></div>';
     h+='<div class="risknote">⚠️ <strong>הרצף הכי ארוך אי־פעם: '+stats.worstSeason.longest+' משחקים</strong> (עונת '+esc(stats.worstSeason.season)+'). זה המקסימום ההיסטורי שהשיטה היתה צריכה לשרוד. "נתקע בסוף" = כמה משחקים ללא תיקו נשארו פתוחים כשהעונה נגמרה — אם היית באמצע רצף הכפלות שם, זה הפסד נעול בלי אפשרות תיקון.</div>';
     h+='<div class="chart">'+svgBars(stats.perSeason.map(function(pp){return {label:pp.season.slice(2), value:pp.longest, color:pp.longest>=8?"#e5484d":"#f2b705", title:"עונת "+pp.season+": רצף מקס׳ "+pp.longest};}),{h:180})+'</div>';
   }
@@ -913,7 +914,7 @@ function runLab(){
         seq: ms.filter(function(m){return m.home===t||m.away===t;}) });
     });
   });
-  var TH=[0,2,3,4,5], ML=[0,3,5], TM=["all","excl","delay","only"], OD=["any","sweet","high"], BL=[false,true], res=[];
+  var TH=[0,8,10,12,14], ML=[0,3,5], TM=["all","excl","delay","only"], OD=["any","sweet","high"], BL=[false,true], res=[];
   BL.forEach(function(bl){ OD.forEach(function(od){ TM.forEach(function(tm){ ML.forEach(function(ml){ TH.forEach(function(t){
     var rng=oddsRangeOf(od);
     var pl=0, cy=0, se=0, bu=0, mx=0, mc=0;
@@ -937,14 +938,14 @@ function runLab(){
   var tmLbl={all:"רגיל",excl:"בלי מובילות",delay:"מובילות +3",only:"רק מובילות"};
   var odLbl={any:"הכל",sweet:"3.0–3.3",high:"3.3–3.8"};
   var h='<p class="lead" style="margin-top:14px">נבדקו '+res.length+' שילובים (כולל מסנני יחס ואיזון) על '+entries.length+' קבוצות־עונה. מדורג: קודם שילובים בטוחים (0 פשיטות, 0 היתקעויות), ואז לפי רווח.</p>';
-  h+='<table class="rtable"><tr><th>#</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>יחס</th><th>מאוזנות</th><th>רווח</th><th>תפיסות</th><th>נתקע</th><th>פשיטות</th><th>סונן</th></tr>';
+  h+='<div class="rtable-wrap"><table class="rtable"><tr><th>#</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>יחס</th><th>מאוזנות</th><th>רווח</th><th>תפיסות</th><th>נתקע</th><th>פשיטות</th><th>סונן</th></tr>';
   res.slice(0,15).forEach(function(r,i){
     var safe=r.se===0&&r.bu===0;
     h+='<tr><td>'+(i+1)+'</td><td class="sea">'+r.t+'</td><td>'+r.ml+'</td><td>'+tmLbl[r.tm]+'</td><td>'+odLbl[r.od]+'</td><td>'+(r.bl?"כן":"—")+'</td>'+
        '<td class="'+(r.pl>=0?"":"hot")+'" style="'+(safe&&r.pl>0?"color:#3dd68c;font-weight:800":"")+'">'+(r.pl>=0?"+":"")+fmt(r.pl)+'</td>'+
        '<td>'+r.cy+'</td><td class="'+(r.se>0?"hot":"")+'">'+r.se+'</td><td class="'+(r.bu>0?"hot":"")+'">'+r.bu+'</td><td class="'+(r.mc>0?"hot":"")+'">'+r.mc+'</td></tr>';
   });
-  h+='</table>';
+  h+='</table></div>';
   h+='<div class="risknote">🧭 <strong>איך להשתמש בזה נכון (שלב 3 שלך):</strong> שילוב שמנצח כאן עדיין לא הוכיח כלום — כשבודקים 45 שילובים, כמה תמיד "ינצחו" במקרה. קח את 2–3 המובילים, החלף ליגה או עונה בתפריט למעלה, והרץ שוב. שילוב אמיתי ישרוד את המעבר; שילוב מקרי יקרוס. המסנן "3 המובילות" נקבע לפי הטבלה הסופית של <strong>העונה הקודמת</strong> — מידע שבאמת היה ידוע מראש. לכן העונה הראשונה בנתונים משמשת רק כבסיס לזיהוי המובילות, והמסנן פעיל מהעונה השנייה ואילך. במצב "רק 3 המובילות" מהמרים רק על קבוצות שסיימו בטופ־3 בעונה שלפני — שם היחס לתיקו בדרך כלל גבוה יותר.</div>';
   out.innerHTML=h;
 }
