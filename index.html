@@ -936,14 +936,15 @@ function runLab(){
     });
   });
   // פרמטרים
-  var TH=[]; for(var _t=0;_t<=15;_t++) TH.push(_t);
-  var ML=[0,3,5,8,10,12,14,16];
+  var TH=[]; for(var _t=0;_t<=20;_t++) TH.push(_t);
+  var ML=[0,3,5,8,10,12,14,16,18,20,22,25];
   // TM: all / excl2 / excl3 / excl4 / only2 / only3 / only4
   var TM=["all","excl2","excl3","excl4","only2","only3","only4"];
-  var OD=["any","low3","sweet","high"], BL=[false,true];
+  var OD=["any","above3","low3","sweet","high"], BL=[false,true];
   var total=TH.length*ML.length*TM.length*OD.length*BL.length;
   var res=[], done=0;
   function oddsRangeOfEx(od){
+    if(od==="above3") return [3.0,99];
     if(od==="low3") return [3.0,3.1];
     if(od==="sweet") return [3.0,3.3];
     if(od==="high") return [3.3,3.8];
@@ -989,7 +990,7 @@ function runLab(){
       return b.pl-a.pl;
     });
     var tmLbl={all:"כל הקבוצות",excl2:"בלי 2 מוב",excl3:"בלי 3 מוב",excl4:"בלי 4 מוב",only2:"רק 2 מוב",only3:"רק 3 מוב",only4:"רק 4 מוב"};
-    var odLbl={any:"הכל",low3:"3.0–3.1",sweet:"3.0–3.3",high:"3.3–3.8"};
+    var odLbl={any:"הכל",above3:"3.0+",low3:"3.0–3.1",sweet:"3.0–3.3",high:"3.3–3.8"};
     var h='<p class="lead" style="margin-top:14px">נבדקו <strong>'+res.length.toLocaleString()+'</strong> שילובים על '+entries.length+' קבוצות־עונה. מדורג: קודם שילובים בטוחים (0 פשיטות, 0 היתקעויות), ואז לפי רווח.</p>';
     h+='<div class="rtable-wrap"><table class="rtable"><tr><th>#</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>יחס</th><th>מאוזנות</th><th>רווח</th><th>תפיסות</th><th>נתקע</th><th>פשיטות</th><th>סונן</th></tr>';
     res.slice(0,20).forEach(function(r,i){
