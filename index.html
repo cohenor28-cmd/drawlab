@@ -297,6 +297,22 @@ function loadPinned(){
     if(s) state.pinnedCombos=JSON.parse(s);
   }catch(e){}
 }
+function computePinnedScore(p){
+  // חשב ציון משוקלל לפין לפי אותה נוסחה כמו בהשוואה בין ליגות
+  // p.results = [{league, pl, cy, se, bu, mc, mx, en}, ...]
+  if(!p.results || !p.results.length) return {score:0,totalEn:0,worstEff:null};
+  var totalBusts=0, totalSe=0, totalEn=0;
+  p.results.forEach(function(r){ totalBusts+=Number(r.bu)||0; totalSe+=Number(r.se)||0; totalEn+=Number(r.en)||0; });
+  var incidents=totalBusts+totalSe;
+  var safety=1/(1+incidents);
+  var conf=Math.min(1, totalEn/20);
+  var effs=p.results.filter(function(r){ return (Number(r.en)||0)>0 && (Number(r.mx)||0)>0; })
+    .map(function(r){ return (Number(r.pl)||0)/(Number(r.mx)||1); });
+  var worstEff=effs.length>0 ? Math.min.apply(null,effs) : null;
+  var effNorm=worstEff!==null ? Math.max(0,Math.min(1,worstEff/2)) : 0;
+  var score=Math.round(100*safety*conf*effNorm);
+  return {score:score, totalEn:totalEn, worstEff:worstEff};
+}
 function renderPinned(){
   var sec=el('pinnedSec'), wrap=el('pinnedTableWrap');
   if(!sec) return;
@@ -307,21 +323,38 @@ function renderPinned(){
   }
   sec.classList.remove('hidden');
   var curLeague=state.leagueFilter+"|"+state.seasonFilter;
-  var h='<div class="rtable-wrap"><table class="rtable"><tr><th>סף</th><th>עצירה</th><th>מובילות</th>';
-  // הוסף עמודות לכל ליגה שנבדקה
+  // אסוף כל הליגות שנבדקו
   var allLeagues=[];
   state.pinnedCombos.forEach(function(p){ p.results.forEach(function(r){ if(allLeagues.indexOf(r.league)<0) allLeagues.push(r.league); }); });
-  allLeagues.forEach(function(lg){ h+='<th style="font-size:10px;max-width:60px;word-break:break-all">'+esc(lg.replace('|','\n'))+'</th>'; });
+  // כותרות ליגות — שם קצר
+  var lgShort={E0:'🏴󠁧󠁢󠁥󠁮󠁧󠁿 אנג',SP1:'🇪🇸 ספר',I1:'🇮🇹 איט',D1:'🇩🇪 גרמ',F1:'🇫🇷 צרפ'};
+  var h='<div class="rtable-wrap"><table class="rtable"><tr><th>ציון</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>כניסות</th><th>יעילות גרועה</th>';
+  allLeagues.forEach(function(lg){
+    var parts=lg.split('|'); var lcode=parts[0], season=parts[1]||'';
+    var shortName=lgShort[lcode]||lcode;
+    h+='<th style="font-size:10px">'+esc(shortName)+'<br><span style="color:#5f7a6d;font-weight:400">'+esc(season)+'</span></th>';
+  });
   h+='<th>מחק</th></tr>';
   state.pinnedCombos.forEach(function(p,pi){
+    var sc=computePinnedScore(p);
+    var scoreColor=sc.score>=60?'color:#3dd68c;font-weight:900':sc.score>=30?'color:#f2b705;font-weight:700':'color:#ff8a5c;font-weight:700';
+    var scoreBg=sc.score>=60?'background:#0a2e1e':sc.score>=30?'background:#1a180a':'background:#2a0f11';
     var isActive=p.results.some(function(r){return r.league===curLeague;});
-    h+='<tr class="pinned-row'+(isActive?' active-league':'')+'">';
-    h+='<td class="sea">'+p.t+'</td><td>'+p.ml+'</td><td>'+esc(p.tm)+'</td><td>'+esc(p.bl)+'</td>';
+    h+='<tr class="pinned-row'+(isActive?' active-league':'')+'" style="'+scoreBg+'">';
+    h+='<td style="'+scoreColor+'">'+sc.score+'</td>';
+    h+='<td class="sea">'+p.t+'</td><td>'+p.ml+'</td><td>'+esc(p.tm)+(p.bl&&p.bl!=='—'?' ⚖️':'')+'</td>';
+    h+='<td class="'+(sc.totalEn<15?'hot':'')+'">'+sc.totalEn+'</td>';
+    h+='<td>'+(sc.worstEff!==null?(sc.worstEff>=0?'+':'')+sc.worstEff.toFixed(2)+'x':'—')+'</td>';
     allLeagues.forEach(function(lg){
       var res=p.results.find(function(r){return r.league===lg;});
       if(res){
-        var safe=res.se==0&&res.bu==0;
-        h+='<td style="'+(safe&&res.pl>0?'color:#3dd68c;font-weight:800':res.pl<0?'color:#ff8a5c':'')+'">'+(res.pl>=0?"+":"")+fmt(res.pl)+'<br><span style="font-size:9px;color:#5f7a6d">ת:'+res.cy+' נ:'+res.se+' פ:'+res.bu+'</span></td>';
+        var safe=(Number(res.se)||0)===0&&(Number(res.bu)||0)===0;
+        var plNum=Number(res.pl)||0;
+        var plColor=(safe&&plNum>0)?'color:#3dd68c;font-weight:800':(plNum<0?'color:#ff8a5c':'');
+        var enNum=Number(res.en)||0;
+        var mxNum=Number(res.mx)||0;
+        var effStr=enNum>0&&mxNum>0?((plNum/mxNum)>=0?'+':'')+( plNum/mxNum).toFixed(2)+'x':'';
+        h+='<td style="'+plColor+'">'+(plNum>=0?"+":"")+fmt(plNum)+'<br><span style="font-size:9px;color:#5f7a6d">'+enNum+'כ'+(Number(res.bu)>0?' '+res.bu+'פ':'')+(Number(res.se)>0?' '+res.se+'נ':'')+(effStr?' '+effStr:'')+'</span></td>';
       } else {
         h+='<td style="color:#5f7a6d">—</td>';
       }
@@ -329,6 +362,7 @@ function renderPinned(){
     h+='<td><button class="pin-del" data-pi="'+pi+'">✕</button></td></tr>';
   });
   h+='</table></div>';
+  h+='<div class="risknote" style="margin-top:10px">🎯 <strong>ציון = 100 × בטיחות × מובהקות × יעילות_בליגה_הגרועה</strong> — מחושב לפי כל הליגות שנבדקו לשילוב זה. <strong style="color:#3dd68c">60+</strong> עקבי ובטוח · <strong style="color:#f2b705">30–59</strong> מבטיח · <strong style="color:#ff8a5c">מתחת 30</strong> לא עקבי. הוסף ליגות נוספות ע"י בחירת ליגה/עונה שונה וסריקה מחדש.</div>';
   wrap.innerHTML=h;
   wrap.querySelectorAll('.pin-del').forEach(function(btn){
     btn.addEventListener('click',function(){
@@ -1095,10 +1129,10 @@ function runLab(){
         var existing=state.pinnedCombos.find(function(p){return p.key===d.key;});
         if(!existing){
           state.pinnedCombos.push({key:d.key,t:d.t,ml:d.ml,tm:d.tm,bl:d.bl,
-            results:[{league:curLeague,pl:d.pl,cy:d.cy,se:d.se,bu:d.bu,mc:d.mc}]});
+            results:[{league:curLeague,pl:d.pl,cy:d.cy,se:d.se,bu:d.bu,mc:d.mc,mx:d.mx,en:d.en}]});
         } else {
           if(!existing.results.some(function(r){return r.league===curLeague;})){
-            existing.results.push({league:curLeague,pl:d.pl,cy:d.cy,se:d.se,bu:d.bu,mc:d.mc});
+            existing.results.push({league:curLeague,pl:d.pl,cy:d.cy,se:d.se,bu:d.bu,mc:d.mc,mx:d.mx,en:d.en});
           }
         }
       } else {
