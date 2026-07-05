@@ -200,7 +200,6 @@
       <label class="field"><span>התחשב בגבולות עונה</span><select id="seasonAwareSel"><option value="1">כן (מומלץ)</option><option value="0">לא</option></select></label>
       <label class="field"><span>המר רק כשיחס התיקו</span><select id="oddsRangeSel"><option value="any">כל יחס</option><option value="sweet">3.0–3.3 (אזור מתוק)</option><option value="high">3.3–3.8 (פרמיה)</option></select></label>
       <label class="field"><span>רק קבוצות מאוזנות</span><select id="balancedSel"><option value="0">לא</option><option value="1">כן (יחסי 1/2 קרובים)</option></select></label>
-      <label class="field"><span>מצב מסנן</span><select id="filterModeSel"><option value="perMatch">לפי משחק (ברירת מחדל)</option><option value="entryOnly">בפתיחת רצף בלבד</option></select></label>
     </div>
     <div class="thresh">
       <div class="thresh-l" id="threshLbl"></div>
@@ -1507,7 +1506,7 @@ function bind(){
   el("seasonAwareSel").addEventListener("change", function(e){ state.seasonAware=e.target.value==="1"; softRefresh(); });
   el("oddsRangeSel").addEventListener("change", function(e){ state.oddsRange=e.target.value; softRefresh(); });
   el("balancedSel").addEventListener("change", function(e){ state.balanced=e.target.value==="1"; softRefresh(); });
-  el("filterModeSel").addEventListener("change", function(e){ state.filterMode=e.target.value; softRefresh(); });
+
   el("statsFab").addEventListener("click", function(){ renderDrawer(); el("statsDrawer").classList.remove("hidden"); });
   el("drawerClose").addEventListener("click", function(){ el("statsDrawer").classList.add("hidden"); });
   el("statsDrawer").addEventListener("click", function(e){ if(e.target.id==="statsDrawer") el("statsDrawer").classList.add("hidden"); });
@@ -1533,7 +1532,7 @@ function init(){
   el("baseIn").value=state.base; el("capIn").value=state.cap; el("fixedOddsIn").value=state.fixedOdds;
   el("oddsModeSel").value=state.oddsMode; el("threshRange").value=state.threshold;
   el("minLeftIn").value=state.minGamesLeft; el("seasonAwareSel").value=state.seasonAware?"1":"0";
-  el("oddsRangeSel").value=state.oddsRange; el("balancedSel").value=state.balanced?"1":"0"; el("filterModeSel").value=state.filterMode||"perMatch";
+  el("oddsRangeSel").value=state.oddsRange; el("balancedSel").value=state.balanced?"1":"0";
   bind();
   afterData();
   renderPinned();
