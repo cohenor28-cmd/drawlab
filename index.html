@@ -287,6 +287,7 @@ var state = { matches:[], sources:[], team:"", leagueFilter:"ALL", seasonFilter:
   pinnedCombos:[] };
 var storageOK = true;
 var _labRes=[], _labEntries=[], _labSortMode='profit';
+var _crossRes=[], _crossLeagues=[];
 
 function savePinned(){
   try{ localStorage.setItem('drawlab_pinned', JSON.stringify(state.pinnedCombos)); }catch(e){}
@@ -362,6 +363,7 @@ function renderPinned(){
     h+='<td><button class="pin-del" data-pi="'+pi+'">✕</button></td></tr>';
   });
   h+='</table></div>';
+  h+='<button onclick="window._exportPinned()" style="margin-top:10px;padding:7px 14px;border-radius:8px;border:1px solid #2a5a46;background:#0d2e23;color:#f2b705;cursor:pointer;font-family:inherit;font-weight:700;font-size:13px">📥 ייצוא שילובים שמורים CSV ('+state.pinnedCombos.length+')</button>';
   h+='<div class="risknote" style="margin-top:10px">🎯 <strong>ציון = 100 × בטיחות × מובהקות × יעילות_בליגה_הגרועה</strong> — מחושב לפי כל הליגות שנבדקו לשילוב זה. <strong style="color:#3dd68c">60+</strong> עקבי ובטוח · <strong style="color:#f2b705">30–59</strong> מבטיח · <strong style="color:#ff8a5c">מתחת 30</strong> לא עקבי. הוסף ליגות נוספות ע"י בחירת ליגה/עונה שונה וסריקה מחדש.</div>';
   wrap.innerHTML=h;
   wrap.querySelectorAll('.pin-del').forEach(function(btn){
@@ -1130,6 +1132,7 @@ function runLab(){
         h2+='<td class="'+(r.se>0?"hot":"")+'">'+r.se+'</td><td class="'+(r.bu>0?"hot":"")+'">'+r.bu+'</td></tr>';
       });
       h2+='</table></div>';
+      h2+='<button onclick="window._exportLab()" style="margin-top:10px;padding:7px 14px;border-radius:8px;border:1px solid #2a5a46;background:#0d2e23;color:#f2b705;cursor:pointer;font-family:inherit;font-weight:700;font-size:13px">📥 ייצוא כל השילובים CSV ('+_labRes.length.toLocaleString()+')</button>';
       h2+='<div class="risknote" style="margin-top:10px;border-color:#e5484d">⚠️ <strong>זהירות סטטיסטית:</strong> שילוב עם פחות מעשרה וחמשה כניסות (סומן באדום) לא הוכיח את עצמו סטטיסטית — מדגם קטן יכול להצליח במקרה. לפני הגדלת סכומות על שילוב נדיר, חובה לאמת אותו על ליגה ועונה אחרות ללא שינוי בהגדרות.</div>';
       h2+='<div class="risknote">🧭 <strong>איך להשתמש בזה נכון (שלב 3 שלך):</strong> שילוב שמנצח כאן עדיין לא הוכיח כלום. קח את 2–3 המובילים, החלף ליגה או עונה בתפריט למעלה, והרץ שוב. שילוב אמיתי ישרוד את המעבר; שילוב מקרי יקרוס. המסנן נקבע לפי הטבלה הסופית של <strong>העונה הקודמת</strong>.</div>';
       out.innerHTML=h2;
@@ -1275,6 +1278,7 @@ function runCrossLeague(){
 
     // סיים — מיין לפי ציון יורד
     crossRes.sort(function(a,b){ return b.score-a.score; });
+    _crossRes=crossRes; _crossLeagues=leagues;
     var tmLbl={all:'כל הקבוצות',excl2:'בלי 2 מוב',excl3:'בלי 3 מוב',excl4:'בלי 4 מוב',only2:'רק 2 מוב',only3:'רק 3 מוב',only4:'רק 4 מוב'};
     // שמות ליגות מקוצרים
     var lgShort = {E0:'🏴󠁧󠁢󠁥󠁮󠁧󠁿 אנג',SP1:'🇪🇸 ספר',I1:'🇮🇹 איט',D1:'🇩🇪 גרמ',F1:'🇫🇷 צרפ'};
@@ -1305,12 +1309,79 @@ function runCrossLeague(){
       h+='</tr>';
     });
     h+='</table></div>';
+    h+='<button onclick="window._exportCross(_crossRes,_crossLeagues)" style="margin-top:10px;padding:7px 14px;border-radius:8px;border:1px solid #2a5a46;background:#0d2e23;color:#f2b705;cursor:pointer;font-family:inherit;font-weight:700;font-size:13px">📥 ייצוא כל השילובים CSV ('+crossRes.length.toLocaleString()+')</button>';
     h+='<div class="risknote" style="margin-top:12px">🎯 <strong>איך לקרוא את הציון:</strong> ציון = 100 × בטיחות × מובהקות × יעילות_בליגה_הגרועה. <strong style="color:#3dd68c">60+</strong> = עקבי, בטוח ומבוסס. <strong style="color:#f2b705">30–59</strong> = מבטיח אך לא מספיק עקבי. <strong style="color:#ff8a5c">מתחת ל-30</strong> = לא עקבי. שילוב עם ציון גבוה כאן כדאי לאמת על עונה שלישית כשתתווסף. — (מקפה) = פחות מכניסה אחת בליגה זו עם הפרמטרים הנוכחיים.</div>';
     h+='</div>';
     crossOut.innerHTML=h;
   }
   setTimeout(runCrossChunk,0);
 }
+
+/* ===== ייצוא CSV ===== */
+function csvEscape(v){
+  var s=String(v===null||v===undefined?'':v);
+  if(s.indexOf(',')>=0||s.indexOf('"')>=0||s.indexOf('\n')>=0) return '"'+s.replace(/"/g,'""')+'"';
+  return s;
+}
+function downloadCSV(filename, rows){
+  var bom='\uFEFF';
+  var csv=bom+rows.map(function(r){return r.map(csvEscape).join(',');}).join('\r\n');
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a'); a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); },200);
+}
+window._exportLab=function(){
+  if(!_labRes||!_labRes.length){ alert('קודם הרץ סריקה.'); return; }
+  var tmLbl={all:'כל הקבוצות',excl2:'בלי 2 מוב',excl3:'בלי 3 מוב',excl4:'בלי 4 מוב',only2:'רק 2 מוב',only3:'רק 3 מוב',only4:'רק 4 מוב'};
+  var sorted=_labRes.slice().sort(function(a,b){
+    var sa=(a.se===0&&a.bu===0)?1:0,sb=(b.se===0&&b.bu===0)?1:0;
+    if(sa!==sb) return sb-sa;
+    return (b.score||0)-(a.score||0);
+  });
+  var header=['ציון','סף','עצירה','מובילות','מאוזן','רווח','כניסות','גבוה (שק)','רווח/חשיפה','נתקע','פשיטות','תפיסות','מס הימורים'];
+  var rows=[header].concat(sorted.map(function(r){
+    return [r.score||0,r.t,r.ml,tmLbl[r.tm]||r.tm,r.bl?'כן':'לא',r.pl,r.en,r.mx,r.eff,r.se,r.bu,r.cy,r.tb];
+  }));
+  var lg=state.leagueFilter==='ALL'?'all':state.leagueFilter;
+  var sn=state.seasonFilter==='ALL'?'all':state.seasonFilter.replace('/','_');
+  downloadCSV('drawlab_scan_'+lg+'_'+sn+'.csv',rows);
+};
+window._exportCross=function(crossResData,leaguesList){
+  if(!crossResData||!crossResData.length){ alert('קודם הרץ השוואה.'); return; }
+  var tmLbl={all:'כל הקבוצות',excl2:'בלי 2 מוב',excl3:'בלי 3 מוב',excl4:'בלי 4 מוב',only2:'רק 2 מוב',only3:'רק 3 מוב',only4:'רק 4 מוב'};
+  var header=['ציון','סף','עצירה','מובילות','מאוזן','כניסות','יעילות גרועה'];
+  leaguesList.forEach(function(lg){ header.push('רווח_'+lg); header.push('כניסות_'+lg); header.push('פשיטות_'+lg); header.push('נתקע_'+lg); });
+  var rows=[header].concat(crossResData.map(function(r){
+    var row=[r.score,r.t,r.ml,tmLbl[r.tm]||r.tm,r.bl?'כן':'לא',r.totalEn,r.worstEff!==null?r.worstEff.toFixed(3):''];
+    leaguesList.forEach(function(lg){
+      var ld=r.perLeague[lg];
+      if(ld&&ld.en>0){ row.push(ld.pl); row.push(ld.en); row.push(ld.bu); row.push(ld.se); }
+      else { row.push(''); row.push(0); row.push(''); row.push(''); }
+    });
+    return row;
+  }));
+  downloadCSV('drawlab_cross_leagues.csv',rows);
+};
+window._exportPinned=function(){
+  if(!state.pinnedCombos||!state.pinnedCombos.length){ alert('אין שילובים שמורים.'); return; }
+  var allLeagues=[];
+  state.pinnedCombos.forEach(function(p){ p.results.forEach(function(r){ if(allLeagues.indexOf(r.league)<0) allLeagues.push(r.league); }); });
+  var header=['ציון','סף','עצירה','מובילות','מאוזן','כניסות','יעילות גרועה'];
+  allLeagues.forEach(function(lg){ header.push('רווח_'+lg); header.push('כניסות_'+lg); header.push('פשיטות_'+lg); header.push('נתקע_'+lg); });
+  var rows=[header].concat(state.pinnedCombos.map(function(p){
+    var sc=computePinnedScore(p);
+    var row=[sc.score,p.t,p.ml,p.tm,p.bl&&p.bl!=='—'?'כן':'לא',sc.totalEn,sc.worstEff!==null?sc.worstEff.toFixed(3):''];
+    allLeagues.forEach(function(lg){
+      var res=p.results.find(function(r){return r.league===lg;});
+      if(res){ row.push(Number(res.pl)||0); row.push(Number(res.en)||0); row.push(Number(res.bu)||0); row.push(Number(res.se)||0); }
+      else { row.push(''); row.push(0); row.push(''); row.push(''); }
+    });
+    return row;
+  }));
+  downloadCSV('drawlab_pinned.csv',rows);
+};
 
 /* ===== קישור אירועים ===== */
 function bind(){
