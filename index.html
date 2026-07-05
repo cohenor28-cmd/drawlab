@@ -528,9 +528,16 @@ function simulate(seq, o){
   var sizes={}; seq.forEach(function(m){ sizes[m.season]=(sizes[m.season]||0)+1; });
   var seen={}, remainAfter=new Array(seq.length), seenBefore=new Array(seq.length);
   for(var q=0;q<seq.length;q++){ var sq=seq[q].season; seen[sq]=(seen[sq]||0)+1; remainAfter[q]=sizes[sq]-seen[sq]; seenBefore[q]=seen[sq]-1; }
-  // חשב אחוז תיקו לקבוצה מהרצף הנוכחי (כל הנתונים)
-  var totalGames=seq.length, totalDraws=seq.filter(function(m){return m.isDraw;}).length;
-  var teamDrawPct=totalGames>0?totalDraws/totalGames:0;
+  // חשב אחוז תיקו לקבוצה לפי עונה קודמת בלבד (מניעת דליפת מידע)
+  var seasonList=Object.keys(sizes).sort();
+  var prevSeasonDrawPct={}; // season -> drawPct של העונה הקודמת
+  for(var _si=0;_si<seasonList.length;_si++){
+    if(_si===0){ prevSeasonDrawPct[seasonList[_si]]=null; continue; } // אין עונה קודמת
+    var prevSn=seasonList[_si-1];
+    var prevG=0, prevD=0;
+    seq.forEach(function(m){ if(m.season===prevSn){ prevG++; if(m.isDraw) prevD++; } });
+    prevSeasonDrawPct[seasonList[_si]]=prevG>0?prevD/prevG:null;
+  }
   var noDraw=0, betting=false, stake=o.base, pl=0, maxStake=0, busts=0, cyclesWon=0, lr=0, mlr=0, seasonEndBusts=0, missedCatches=0, equity=[], totalBets=0, entries=0, stopLossExits=0, stopLossLocked=0;
   var slCount=0; // מונה הפסדות רצופות בתוך רצף פעיל
   for(var i=0;i<seq.length;i++){
@@ -548,8 +555,11 @@ function simulate(seq, o){
     // מסנן עונה: דלג על X ראשונים ו-Y אחרונים
     if(eligible && skipFirst>0 && seenBefore[i]<skipFirst) eligible=false;
     if(eligible && skipLast>0 && remainAfter[i]<skipLast) eligible=false;
-    // מסנן אחוז תיקו קבוצה
-    if(eligible && minDrawPct>0 && teamDrawPct<minDrawPct) eligible=false;
+    // מסנן אחוז תיקו קבוצה — לפי עונה קודמת בלבד
+    if(eligible && minDrawPct>0){
+      var pdp=prevSeasonDrawPct[m.season];
+      if(pdp===null||pdp===undefined||pdp<minDrawPct) eligible=false;
+    }
     var entryOnly = o.filterMode === 'entryOnly';
     if(!betting && noDraw>=o.threshold && remainAfter[i]>=minLeft && eligible){ betting=true; stake=o.base; entries++; }
     if(betting){
