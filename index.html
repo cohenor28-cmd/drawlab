@@ -868,6 +868,7 @@ function updateDataInfo(){
     vh+='</div>';
   });
   vh+='<p style="font-size:11px;color:#5f7a6d">🟢 ירוק = 30%+ תפיסה | 🟡 צהוב = 20-29% | 🔴 אדום = מתחת ל-20% | עומק גבוה עם אחוז גבוה = שווה לחכות</p>';
+  vh+='<button onclick="window._exportSurvivalAll()" style="margin-top:8px;padding:7px 16px;border-radius:8px;border:1px solid #2a5a46;background:#0d2e23;color:#3dd68c;cursor:pointer;font-family:inherit;font-weight:700;font-size:13px">📥 ייצוא כל הליגות בקובץ אחד</button>';
 
   vh+='</div>'; el("verify").innerHTML=vh;
 }
@@ -883,6 +884,27 @@ window._exportSurvival=function(league){
     rows.push([d,entry.reached||0,entry.caught||0,pct+'%']);
   }
   downloadCSV('drawlab_survival_'+league.replace(/[^a-zA-Z0-9]/g,'_')+'.csv',rows);
+};
+
+window._exportSurvivalAll=function(){
+  var data=window._survivalData;
+  if(!data||!Object.keys(data).length){ alert('אין נתוני הישרדות. פתח תפריט הסטטיסטיקה קודם.'); return; }
+  var leagues=Object.keys(data);
+  // header: עומק, אחרין לכל ליגה: הגיעו, נתפסו, תפיסה %
+  var header=['עומק'];
+  leagues.forEach(function(lg){ header.push(lg+' הגיעו'); header.push(lg+' נתפסו'); header.push(lg+' תפיסה %'); });
+  var rows=[header];
+  for(var d=1;d<=20;d++){
+    var row=[d];
+    leagues.forEach(function(lg){
+      var sd=data[lg]||[];
+      var entry=sd[d]||{reached:0,caught:0};
+      var pct=entry.reached>0?Math.round(entry.caught/entry.reached*100):0;
+      row.push(entry.reached||0); row.push(entry.caught||0); row.push(pct+'%');
+    });
+    rows.push(row);
+  }
+  downloadCSV('drawlab_survival_all_leagues.csv',rows);
 };
 
 function leaguesList(){ var s={}; state.matches.forEach(function(m){s[m.league]=1;}); return Object.keys(s).sort(); }
