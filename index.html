@@ -1183,19 +1183,27 @@ function runLab(){
       });
     });
   });
-  // פרמטרים
-  var TH=[]; for(var _t=0;_t<=20;_t++) TH.push(_t);
-  var ML=[]; for(var _m=0;_m<=20;_m++) ML.push(_m);
-  // TM: all / excl2 / excl3 / excl4 / only2 / only3 / only4
+  // פרמטרים — צומצמו כדי לפנות מקום למסננים החדשים
+  var TH=[2,3,4,5,6,7,8]; // סף: 7 ערכים (במקום 0-20)
+  var ML=[0,2,4,6,8];     // עצירה: 5 ערכים (במקום 0-20)
   var TM=["all","excl2","excl3","excl4","only2","only3","only4"];
   var BL=[false,true];
-  var SL=[0,3,4,5,6,8,10]; // stopLoss: 0=ללא, 3,4,5,6,8,10
-  var total=TH.length*ML.length*TM.length*BL.length*SL.length;
+  var SL=[0,3,5,8];        // stopLoss: 4 ערכים
+  var SF=[0,3,5];          // דלג ראשונים: 0/3/5
+  var SLast=[0,3,5];       // דלג אחרונים: 0/3/5
+  var DP=[0,20,25,30];     // אחוז תיקו מינימלי: 0/20/25/30
+  var total=TH.length*ML.length*TM.length*BL.length*SL.length*SF.length*SLast.length*DP.length;
   _labRes=[]; var done=0;
   function runChunk(){
     var chunkSize=500, count=0;
     while(done<total && count<chunkSize){
       var idx=done;
+      var dpi=Math.floor(idx/(TH.length*ML.length*TM.length*BL.length*SL.length*SF.length*SLast.length));
+      idx-=dpi*(TH.length*ML.length*TM.length*BL.length*SL.length*SF.length*SLast.length);
+      var slasti=Math.floor(idx/(TH.length*ML.length*TM.length*BL.length*SL.length*SF.length));
+      idx-=slasti*(TH.length*ML.length*TM.length*BL.length*SL.length*SF.length);
+      var sfi=Math.floor(idx/(TH.length*ML.length*TM.length*BL.length*SL.length));
+      idx-=sfi*(TH.length*ML.length*TM.length*BL.length*SL.length);
       var sli=Math.floor(idx/(TH.length*ML.length*TM.length*BL.length));
       idx-=sli*(TH.length*ML.length*TM.length*BL.length);
       var bi=Math.floor(idx/(TH.length*ML.length*TM.length));
@@ -1204,20 +1212,20 @@ function runLab(){
       idx-=tmi*(TH.length*ML.length);
       var mli=Math.floor(idx/TH.length);
       var thi=idx%TH.length;
-      var sl=SL[sli], bl=BL[bi], tm=TM[tmi], ml=ML[mli], t=TH[thi];
+      var dp=DP[dpi], slast=SLast[slasti], sf=SF[sfi], sl=SL[sli], bl=BL[bi], tm=TM[tmi], ml=ML[mli], t=TH[thi];
       var pl=0, cy=0, se=0, bu=0, mx=0, mc=0, tb=0, en=0, sle=0;
       _labEntries.forEach(function(e){
         var topList = tm.startsWith("excl")||tm.startsWith("only") ?
           (tm.endsWith("2")?e.top2:tm.endsWith("3")?e.top3:e.top4) : [];
         if(tm.startsWith("excl") && topList.indexOf(e.team)>=0) return;
         if(tm.startsWith("only") && topList.indexOf(e.team)<0) return;
-          var opts={threshold:t, base:state.base, oddsMode:state.oddsMode,
-          fixedOdds:state.fixedOdds, cap:state.cap, minGamesLeft:ml, seasonAware:true, balanced:bl, filterMode:'perMatch', stopLoss:sl, seasonSkipFirst:0, seasonSkipLast:0, minDrawPct:0};
+        var opts={threshold:t, base:state.base, oddsMode:state.oddsMode,
+          fixedOdds:state.fixedOdds, cap:state.cap, minGamesLeft:ml, seasonAware:true, balanced:bl, filterMode:'perMatch', stopLoss:sl, seasonSkipFirst:sf, seasonSkipLast:slast, minDrawPct:dp};
         var r=simulate(e.seq,opts);
         pl+=r.pl; cy+=r.cyclesWon; se+=r.seasonEndBusts; bu+=r.busts; mc+=r.missedCatches; if(r.maxStake>mx)mx=r.maxStake; tb+=r.totalBets; en+=r.entries; sle+=r.stopLossExits;
       });
       var eff=mx>0?Math.round(pl/mx*10)/10:0;
-      _labRes.push({t:t,ml:ml,tm:tm,bl:bl,sl:sl,pl:Math.round(pl),cy:cy,se:se,bu:bu,mc:mc,mx:mx,tb:tb,en:en,eff:eff,sle:sle});
+      _labRes.push({t:t,ml:ml,tm:tm,bl:bl,sl:sl,sf:sf,slast:slast,dp:dp,pl:Math.round(pl),cy:cy,se:se,bu:bu,mc:mc,mx:mx,tb:tb,en:en,eff:eff,sle:sle});
       done++; count++;
     }
     var pct=Math.round(done/total*100);
@@ -1257,7 +1265,7 @@ function runLab(){
       h2+='<button onclick="window._labSort(\"profit\")" style="padding:4px 10px;border-radius:6px;border:1px solid #2a5a46;background:'+(sortBy==='profit'?'#f2b705':'#0d2b1e')+';color:'+(sortBy==='profit'?'#082019':'#f2b705')+';cursor:pointer;font-size:12px">מיין לפי רווח</button>';
       h2+='<button onclick="window._labSort(\"eff\")" style="padding:4px 10px;border-radius:6px;border:1px solid #2a5a46;background:'+(sortBy==='eff'?'#f2b705':'#0d2b1e')+';color:'+(sortBy==='eff'?'#082019':'#f2b705')+';cursor:pointer;font-size:12px">מיין לפי רווח/חשיפה</button>';
       h2+='</div>';
-      h2+='<div class="rtable-wrap"><table class="rtable" id="labResTable"><tr><th>📌</th><th>#</th><th>ציון</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>עצ.הפסד</th><th>רווח</th><th>כניסות</th><th>גבוה (שק)</th><th>רווח/חשיפה</th><th>נתקע</th><th>פשיטות</th><th>נטישות</th></tr>';
+      h2+='<div class="rtable-wrap"><table class="rtable" id="labResTable"><tr><th>📌</th><th>#</th><th>ציון</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>עצ.הפסד</th><th>דלג ראש</th><th>דלג אחר</th><th>תיקו%</th><th>רווח</th><th>כניסות</th><th>גבוה (שק)</th><th>רווח/חשיפה</th><th>נתקע</th><th>פשיטות</th><th>נטישות</th></tr>';
       sorted.slice(0,20).forEach(function(r,i){
         var safe=r.se===0&&r.bu===0;
         var key=r.t+"|"+r.ml+"|"+r.tm+"|"+r.bl;
@@ -1270,6 +1278,9 @@ function runLab(){
         h2+='<td style="'+scoreColor+'">'+r.score+'</td>';
         h2+='<td class="sea">'+r.t+'</td><td>'+r.ml+'</td><td>'+tmLbl[r.tm]+'</td>';
         h2+='<td style="font-size:10px;color:'+(r.sl>0?'#f2b705':'#8fa99b')+'">'+(r.sl>0?r.sl:'—')+'</td>';
+        h2+='<td style="font-size:10px;color:'+(r.sf>0?'#7ec8e3':'#8fa99b')+'">'+(r.sf>0?r.sf:'—')+'</td>';
+        h2+='<td style="font-size:10px;color:'+(r.slast>0?'#7ec8e3':'#8fa99b')+'">'+(r.slast>0?r.slast:'—')+'</td>';
+        h2+='<td style="font-size:10px;color:'+(r.dp>0?'#c084fc':'#8fa99b')+'">'+(r.dp>0?r.dp+'%':'—')+'</td>';
         h2+='<td class="'+(r.pl>=0?"":"hot")+'" style="'+(safe&&r.pl>0?"color:#3dd68c;font-weight:800":"")+'">'+( r.pl>=0?"+":"")+fmt(r.pl)+'</td>';
         h2+='<td class="'+(r.en<15?"hot":"")+'">'+r.en+'</td>';
         h2+='<td class="'+(r.mx>500?"hot":"")+'">'+fmt(r.mx)+'</td>';
@@ -1589,9 +1600,9 @@ window._exportLab=function(lg,sn){
     if(sa!==sb) return sb-sa;
     return (b.score||0)-(a.score||0);
   });
-  var header=['ציון','סף','עצירה','מובילות','עצ.הפסד','מאוזן','רווח','כניסות','גבוה (שק)','רווח/חשיפה','נתקע','פשיטות','תפיסות','מס הימורים','נטישות'];
+  var header=['ציון','סף','עצירה','מובילות','עצ.הפסד','דלג ראשונים','דלג אחרונים','תיקו% מינימום','מאוזן','רווח','כניסות','גבוה (שק)','רווח/חשיפה','נתקע','פשיטות','תפיסות','מס הימורים','נטישות'];
   var rows=[header].concat(sorted.map(function(r){
-    return [r.score||0,r.t,r.ml,tmLbl[r.tm]||r.tm,r.sl>0?r.sl:0,r.bl?'כן':'לא',r.pl,r.en,r.mx,r.eff,r.se,r.bu,r.cy,r.tb,r.sle||0];
+    return [r.score||0,r.t,r.ml,tmLbl[r.tm]||r.tm,r.sl>0?r.sl:0,r.sf||0,r.slast||0,r.dp||0,r.bl?'כן':'לא',r.pl,r.en,r.mx,r.eff,r.se,r.bu,r.cy,r.tb,r.sle||0];
   }));
   downloadCSV('drawlab_scan_'+(lg||'all')+'_'+(sn||'all')+'.csv',rows);
 };
