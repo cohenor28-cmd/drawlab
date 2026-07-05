@@ -282,6 +282,7 @@ var state = { matches:[], sources:[], team:"", leagueFilter:"ALL", seasonFilter:
   base:10, fixedOdds:3, oddsMode:"fixed", threshold:0, cap:5000, minGamesLeft:0, seasonAware:true, oddsRange:"any", balanced:false,
   pinnedCombos:[] };
 var storageOK = true;
+var _labRes=[], _labEntries=[], _labSortMode='profit';
 
 function savePinned(){
   try{ localStorage.setItem('drawlab_pinned', JSON.stringify(state.pinnedCombos)); }catch(e){}
@@ -987,13 +988,13 @@ function runLab(){
       });
     }
   });
-  var g=groupLS(scope), entries=[];
+  var g=groupLS(scope); _labEntries=[];
   Object.keys(g).forEach(function(k){
     var ms=g[k], teams={};
     ms.forEach(function(m){ teams[m.home]=1; teams[m.away]=1; });
     var lg=ms[0].league, sn=ms[0].season;
     Object.keys(teams).forEach(function(t){
-      entries.push({
+      _labEntries.push({
         team:t, lg:lg, sn:sn,
         top2: topNmap[lg+"|"+sn+"|2"] || [],
         top3: topNmap[lg+"|"+sn+"|3"] || [],
@@ -1009,7 +1010,7 @@ function runLab(){
   var TM=["all","excl2","excl3","excl4","only2","only3","only4"];
   var BL=[false,true];
   var total=TH.length*ML.length*TM.length*BL.length;
-  var res=[], done=0;
+  _labRes=[]; var done=0;
   function runChunk(){
     var chunkSize=500, count=0;
     while(done<total && count<chunkSize){
@@ -1033,7 +1034,7 @@ function runLab(){
         pl+=r.pl; cy+=r.cyclesWon; se+=r.seasonEndBusts; bu+=r.busts; mc+=r.missedCatches; if(r.maxStake>mx)mx=r.maxStake; tb+=r.totalBets; en+=r.entries;
       });
       var eff=mx>0?Math.round(pl/mx*10)/10:0;
-      res.push({t:t,ml:ml,tm:tm,bl:bl,pl:Math.round(pl),cy:cy,se:se,bu:bu,mc:mc,mx:mx,tb:tb,en:en,eff:eff});
+      _labRes.push({t:t,ml:ml,tm:tm,bl:bl,pl:Math.round(pl),cy:cy,se:se,bu:bu,mc:mc,mx:mx,tb:tb,en:en,eff:eff});
       done++; count++;
     }
     var pct=Math.round(done/total*100);
@@ -1048,15 +1049,15 @@ function runLab(){
     });
     var tmLbl={all:"כל הקבוצות",excl2:"בלי 2 מוב",excl3:"בלי 3 מוב",excl4:"בלי 4 מוב",only2:"רק 2 מוב",only3:"רק 3 מוב",only4:"רק 4 מוב"};
     var curLeague=state.leagueFilter+"|"+state.seasonFilter;
-    var sortMode='profit';
+    _labSortMode='profit';
     function renderLabTable(sortBy){
-      var sorted=res.slice().sort(function(a,b){
+      var sorted=_labRes.slice().sort(function(a,b){
         var sa=(a.se===0&&a.bu===0)?1:0, sb=(b.se===0&&b.bu===0)?1:0;
         if(sa!==sb) return sb-sa;
         if(sortBy==='eff') return b.eff-a.eff;
         return b.pl-a.pl;
       });
-      var h2='<p class="lead" style="margin-top:14px">נבדקו <strong>'+res.length.toLocaleString()+'</strong> שילובים על '+entries.length+' קבוצות־עונה. מדורג: קודם שילובים בטוחים (0 פשיטות, 0 היתקעויות), ואז לפי '+(sortBy==='eff'?'רווח/חשיפה':'רווח')+'.</p>';
+      var h2='<p class="lead" style="margin-top:14px">נבדקו <strong>'+_labRes.length.toLocaleString()+'</strong> שילובים על '+_labEntries.length+' קבוצות־עונה. מדורג: קודם שילובים בטוחים (0 פשיטות, 0 היתקעויות), ואז לפי '+(sortBy==='eff'?'רווח/חשיפה':'רווח')+'.</p>';
       h2+='<div style="margin-bottom:8px;display:flex;gap:8px;justify-content:flex-end">';
       h2+='<button onclick="window._labSort(\"profit\")" style="padding:4px 10px;border-radius:6px;border:1px solid #2a5a46;background:'+(sortBy==='profit'?'#f2b705':'#0d2b1e')+';color:'+(sortBy==='profit'?'#082019':'#f2b705')+';cursor:pointer;font-size:12px">מיין לפי רווח</button>';
       h2+='<button onclick="window._labSort(\"eff\")" style="padding:4px 10px;border-radius:6px;border:1px solid #2a5a46;background:'+(sortBy==='eff'?'#f2b705':'#0d2b1e')+';color:'+(sortBy==='eff'?'#082019':'#f2b705')+';cursor:pointer;font-size:12px">מיין לפי רווח/חשיפה</button>';
@@ -1079,8 +1080,8 @@ function runLab(){
       h2+='<div class="risknote">🧭 <strong>איך להשתמש בזה נכון (שלב 3 שלך):</strong> שילוב שמנצח כאן עדיין לא הוכיח כלום. קח את 2–3 המובילים, החלף ליגה או עונה בתפריט למעלה, והרץ שוב. שילוב אמיתי ישרוד את המעבר; שילוב מקרי יקרוס. המסנן נקבע לפי הטבלה הסופית של <strong>העונה הקודמת</strong>.</div>';
       out.innerHTML=h2;
     }
-    window._labSort=function(by){ sortMode=by; renderLabTable(by); };
-    renderLabTable(sortMode);
+    window._labSort=function(by){ _labSortMode=by; renderLabTable(by); };
+    renderLabTable(_labSortMode);
     // קשר אירועי checkbox באמצעות event delegation על out (עובד גם אחרי רנדור מחדש)
     out.addEventListener('change',function(ev){
       var cb=ev.target;
