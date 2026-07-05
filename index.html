@@ -1058,8 +1058,8 @@ function runLab(){
       });
       var h2='<p class="lead" style="margin-top:14px">נבדקו <strong>'+res.length.toLocaleString()+'</strong> שילובים על '+entries.length+' קבוצות־עונה. מדורג: קודם שילובים בטוחים (0 פשיטות, 0 היתקעויות), ואז לפי '+(sortBy==='eff'?'רווח/חשיפה':'רווח')+'.</p>';
       h2+='<div style="margin-bottom:8px;display:flex;gap:8px;justify-content:flex-end">';
-      h2+='<button onclick="window._labSort('profit')" style="padding:4px 10px;border-radius:6px;border:1px solid #2a5a46;background:'+(sortBy==='profit'?'#f2b705':'#0d2b1e')+';color:'+(sortBy==='profit'?'#082019':'#f2b705')+';cursor:pointer;font-size:12px">מיין לפי רווח</button>';
-      h2+='<button onclick="window._labSort('eff')" style="padding:4px 10px;border-radius:6px;border:1px solid #2a5a46;background:'+(sortBy==='eff'?'#f2b705':'#0d2b1e')+';color:'+(sortBy==='eff'?'#082019':'#f2b705')+';cursor:pointer;font-size:12px">מיין לפי רווח/חשיפה</button>';
+      h2+='<button onclick="window._labSort(\"profit\")" style="padding:4px 10px;border-radius:6px;border:1px solid #2a5a46;background:'+(sortBy==='profit'?'#f2b705':'#0d2b1e')+';color:'+(sortBy==='profit'?'#082019':'#f2b705')+';cursor:pointer;font-size:12px">מיין לפי רווח</button>';
+      h2+='<button onclick="window._labSort(\"eff\")" style="padding:4px 10px;border-radius:6px;border:1px solid #2a5a46;background:'+(sortBy==='eff'?'#f2b705':'#0d2b1e')+';color:'+(sortBy==='eff'?'#082019':'#f2b705')+';cursor:pointer;font-size:12px">מיין לפי רווח/חשיפה</button>';
       h2+='</div>';
       h2+='<div class="rtable-wrap"><table class="rtable" id="labResTable"><tr><th>📌</th><th>#</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>רווח</th><th>תפיסות</th><th>מס הימורים</th><th>כניסות</th><th>גבוה (שק)</th><th>רווח/חשיפה</th><th>נתקע</th><th>פשיטות</th><th>סונן</th></tr>';
       sorted.slice(0,20).forEach(function(r,i){
