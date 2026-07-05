@@ -302,7 +302,7 @@ function renderPinned(){
   }
   sec.classList.remove('hidden');
   var curLeague=state.leagueFilter+"|"+state.seasonFilter;
-  var h='<div class="rtable-wrap"><table class="rtable"><tr><th>סף</th><th>עצירה</th><th>מובילות</th><th>מאוזנות</th>';
+  var h='<div class="rtable-wrap"><table class="rtable"><tr><th>סף</th><th>עצירה</th><th>מובילות</th>';
   // הוסף עמודות לכל ליגה שנבדקה
   var allLeagues=[];
   state.pinnedCombos.forEach(function(p){ p.results.forEach(function(r){ if(allLeagues.indexOf(r.league)<0) allLeagues.push(r.league); }); });
@@ -450,7 +450,7 @@ function simulate(seq, o){
   var sizes={}; seq.forEach(function(m){ sizes[m.season]=(sizes[m.season]||0)+1; });
   var seen={}, remainAfter=new Array(seq.length);
   for(var q=0;q<seq.length;q++){ var sq=seq[q].season; seen[sq]=(seen[sq]||0)+1; remainAfter[q]=sizes[sq]-seen[sq]; }
-  var noDraw=0, betting=false, stake=o.base, pl=0, maxStake=0, busts=0, cyclesWon=0, lr=0, mlr=0, seasonEndBusts=0, missedCatches=0, equity=[];
+  var noDraw=0, betting=false, stake=o.base, pl=0, maxStake=0, busts=0, cyclesWon=0, lr=0, mlr=0, seasonEndBusts=0, missedCatches=0, equity=[], totalBets=0;
   for(var i=0;i<seq.length;i++){
     var m=seq[i];
     if(seasonAware && i>0 && seq[i].season!==seq[i-1].season){
@@ -470,6 +470,7 @@ function simulate(seq, o){
       } else if(stake>o.cap){ busts++; betting=false; stake=o.base; lr=0; }
       else {
         if(stake>maxStake) maxStake=stake;
+        totalBets++;
         if(m.isDraw){ pl += stake*(odds-1); cyclesWon++; betting=false; stake=o.base; lr=0; }
         else { pl -= stake; stake*=2; lr++; if(lr>mlr)mlr=lr; }
       }
@@ -478,7 +479,7 @@ function simulate(seq, o){
     noDraw = m.isDraw ? 0 : noDraw+1;
   }
   if(seasonAware && betting){ seasonEndBusts++; }
-  return { pl:pl, maxStake:maxStake, busts:busts, cyclesWon:cyclesWon, maxLosingRun:mlr, seasonEndBusts:seasonEndBusts, missedCatches:missedCatches, equity:equity };
+  return { pl:pl, maxStake:maxStake, busts:busts, cyclesWon:cyclesWon, maxLosingRun:mlr, seasonEndBusts:seasonEndBusts, missedCatches:missedCatches, equity:equity, totalBets:totalBets };
 }
 function oddsRangeOf(key){ return key==="sweet"?[3.0,3.3]:key==="high"?[3.3,3.8]:null; }
 
@@ -1020,7 +1021,7 @@ function runLab(){
       var mli=Math.floor(idx/TH.length);
       var thi=idx%TH.length;
       var bl=BL[bi], tm=TM[tmi], ml=ML[mli], t=TH[thi];
-      var pl=0, cy=0, se=0, bu=0, mx=0, mc=0;
+      var pl=0, cy=0, se=0, bu=0, mx=0, mc=0, tb=0;
       entries.forEach(function(e){
         var topList = tm.startsWith("excl")||tm.startsWith("only") ?
           (tm.endsWith("2")?e.top2:tm.endsWith("3")?e.top3:e.top4) : [];
@@ -1029,9 +1030,9 @@ function runLab(){
         var opts={threshold:t, base:state.base, oddsMode:state.oddsMode,
           fixedOdds:state.fixedOdds, cap:state.cap, minGamesLeft:ml, seasonAware:true, balanced:bl};
         var r=simulate(e.seq,opts);
-        pl+=r.pl; cy+=r.cyclesWon; se+=r.seasonEndBusts; bu+=r.busts; mc+=r.missedCatches; if(r.maxStake>mx)mx=r.maxStake;
+        pl+=r.pl; cy+=r.cyclesWon; se+=r.seasonEndBusts; bu+=r.busts; mc+=r.missedCatches; if(r.maxStake>mx)mx=r.maxStake; tb+=r.totalBets;
       });
-      res.push({t:t,ml:ml,tm:tm,bl:bl,pl:Math.round(pl),cy:cy,se:se,bu:bu,mc:mc,mx:mx});
+      res.push({t:t,ml:ml,tm:tm,bl:bl,pl:Math.round(pl),cy:cy,se:se,bu:bu,mc:mc,mx:mx,tb:tb});
       done++; count++;
     }
     var pct=Math.round(done/total*100);
@@ -1047,15 +1048,15 @@ function runLab(){
     var tmLbl={all:"כל הקבוצות",excl2:"בלי 2 מוב",excl3:"בלי 3 מוב",excl4:"בלי 4 מוב",only2:"רק 2 מוב",only3:"רק 3 מוב",only4:"רק 4 מוב"};
     var curLeague=state.leagueFilter+"|"+state.seasonFilter;
     var h='<p class="lead" style="margin-top:14px">נבדקו <strong>'+res.length.toLocaleString()+'</strong> שילובים על '+entries.length+' קבוצות־עונה. מדורג: קודם שילובים בטוחים (0 פשיטות, 0 היתקעויות), ואז לפי רווח.</p>';
-    h+='<div class="rtable-wrap"><table class="rtable" id="labResTable"><tr><th>📌</th><th>#</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>מאוזנות</th><th>רווח</th><th>תפיסות</th><th>נתקע</th><th>פשיטות</th><th>סונן</th></tr>';
+    h+='<div class="rtable-wrap"><table class="rtable" id="labResTable"><tr><th>📌</th><th>#</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>רווח</th><th>תפיסות</th><th>מס הימורים</th><th>גבוה (שק)</th><th>נתקע</th><th>פשיטות</th><th>סונן</th></tr>';
     res.slice(0,20).forEach(function(r,i){
       var safe=r.se===0&&r.bu===0;
       var key=r.t+"|"+r.ml+"|"+r.tm+"|"+r.bl;
       var pinned=state.pinnedCombos.some(function(p){return p.key===key;});
-      h+='<tr><td><input type="checkbox" class="pin-cb" data-key="'+key+'" data-t="'+r.t+'" data-ml="'+r.ml+'" data-tm="'+esc(tmLbl[r.tm])+'" data-bl="'+(r.bl?"כן":"—")+'" data-pl="'+r.pl+'" data-cy="'+r.cy+'" data-se="'+r.se+'" data-bu="'+r.bu+'" data-mc="'+r.mc+'" '+(pinned?"checked":"")+' /></td>';
-      h+='<td>'+(i+1)+'</td><td class="sea">'+r.t+'</td><td>'+r.ml+'</td><td>'+tmLbl[r.tm]+'</td><td>'+(r.bl?"כן":"—")+'</td>'+
+      h+='<tr><td><input type="checkbox" class="pin-cb" data-key="'+key+'" data-t="'+r.t+'" data-ml="'+r.ml+'" data-tm="'+esc(tmLbl[r.tm])+'" data-bl="'+(r.bl?"כן":"—")+'" data-pl="'+r.pl+'" data-cy="'+r.cy+'" data-se="'+r.se+'" data-bu="'+r.bu+'" data-mc="'+r.mc+'" data-tb="'+r.tb+'" data-mx="'+r.mx+'" '+(pinned?"checked":"")+' /></td>';
+      h+='<td>'+(i+1)+'</td><td class="sea">'+r.t+'</td><td>'+r.ml+'</td><td>'+tmLbl[r.tm]+'</td>'+
          '<td class="'+(r.pl>=0?"":"hot")+'" style="'+(safe&&r.pl>0?"color:#3dd68c;font-weight:800":"")+'">'+( r.pl>=0?"+":"")+fmt(r.pl)+'</td>'+
-         '<td>'+r.cy+'</td><td class="'+(r.se>0?"hot":"")+'">' +r.se+'</td><td class="'+(r.bu>0?"hot":"")+'">' +r.bu+'</td><td class="'+(r.mc>0?"hot":"")+'">' +r.mc+'</td></tr>';
+         '<td>'+r.cy+'</td><td>'+r.tb.toLocaleString()+'</td><td class="'+(r.mx>500?"hot":"")+'">'+fmt(r.mx)+'</td><td class="'+(r.se>0?"hot":"")+'">' +r.se+'</td><td class="'+(r.bu>0?"hot":"")+'">' +r.bu+'</td><td class="'+(r.mc>0?"hot":"")+'">' +r.mc+'</td></tr>';
     });
     h+='</table></div>';
     h+='<div class="risknote">🧭 <strong>איך להשתמש בזה נכון (שלב 3 שלך):</strong> שילוב שמנצח כאן עדיין לא הוכיח כלום. קח את 2–3 המובילים, החלף ליגה או עונה בתפריט למעלה, והרץ שוב. שילוב אמיתי ישרוד את המעבר; שילוב מקרי יקרוס. המסנן נקבע לפי הטבלה הסופית של <strong>העונה הקודמת</strong>.</div>';
