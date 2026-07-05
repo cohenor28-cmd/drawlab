@@ -841,31 +841,49 @@ function updateDataInfo(){
 
   // עקומת הישרדות רצפים לכל ליגה
   vh+='<div class="verify-h" style="margin-top:18px;border-top:1px solid #1e4a38;padding-top:14px">📉 עקומת הישרדות רצפים לפי ליגה (ללא מסננים)</div>';
-  vh+='<p style="font-size:11.5px;color:#5f7a6d;margin-top:4px;margin-bottom:8px">לכל עומק: כמה רצפים הגיעו לשם, ואיזה אחוז מהם הסתיים בתיקו. עומק 1 = משחק ראשון ברצף. הטבלה מציגה עומקים 1–12.</p>';
+  vh+='<p style="font-size:11.5px;color:#5f7a6d;margin-top:4px;margin-bottom:8px">לכל עומק: כמה רצפים הגיעו לשם, ואיזה אחוז מהם הסתיים בתיקו. עומק 1 = משחק ראשון ברצף. הטבלה מציגה עומקים 1–20.</p>';
+  // שמור נתוני הישרדות לייצוא
+  window._survivalData = {};
   leagueOrder.forEach(function(league){
     var ls=leagueSummary[league];
     var sd=ls.survivalDepths||[];
+    window._survivalData[league] = sd;
     vh+='<div style="margin-bottom:14px"><strong style="color:#e8f0ea;font-size:13px">'+esc(league)+'</strong>';
     vh+='<div class="rtable-wrap"><table class="rtable" style="margin-top:6px"><tr><th>עומק</th>';
-    for(var d=1;d<=12;d++) vh+='<th>'+d+'</th>';
+    for(var d=1;d<=20;d++) vh+='<th>'+d+'</th>';
     vh+='</tr><tr><td style="color:#8fa99b;font-size:11px">הגיעו</td>';
-    for(var d=1;d<=12;d++){
+    for(var d=1;d<=20;d++){
       var entry=sd[d]||{reached:0,caught:0};
       vh+='<td>'+(entry.reached||0)+'</td>';
     }
     vh+='</tr><tr><td style="color:#8fa99b;font-size:11px">תפיסה %</td>';
-    for(var d=1;d<=12;d++){
+    for(var d=1;d<=20;d++){
       var entry=sd[d]||{reached:0,caught:0};
       var pct=entry.reached>0?Math.round(entry.caught/entry.reached*100):0;
       var col=pct>=30?'color:#3dd68c;font-weight:700':pct>=20?'color:#f2b705':'color:#ff8a5c';
       vh+='<td style="'+col+'">'+pct+'%</td>';
     }
-    vh+='</tr></table></div></div>';
+    vh+='</tr></table></div>';
+    vh+='<button onclick="window._exportSurvival(\''+esc(league)+'\')" style="margin-bottom:10px;padding:5px 12px;border-radius:7px;border:1px solid #2a5a46;background:#0d2e23;color:#f2b705;cursor:pointer;font-family:inherit;font-weight:700;font-size:12px">📥 ייצוא עקומת הישרדות — '+esc(league)+'</button>';
+    vh+='</div>';
   });
   vh+='<p style="font-size:11px;color:#5f7a6d">🟢 ירוק = 30%+ תפיסה | 🟡 צהוב = 20-29% | 🔴 אדום = מתחת ל-20% | עומק גבוה עם אחוז גבוה = שווה לחכות</p>';
 
   vh+='</div>'; el("verify").innerHTML=vh;
 }
+
+window._exportSurvival=function(league){
+  var sd=window._survivalData&&window._survivalData[league];
+  if(!sd){ alert('אין נתוני הישרדות. פתח תפריט הסטטיסטיקה קודם.'); return; }
+  var header=['עומק','הגיעו','נתפסו','תפיסה %'];
+  var rows=[header];
+  for(var d=1;d<=20;d++){
+    var entry=sd[d]||{reached:0,caught:0};
+    var pct=entry.reached>0?Math.round(entry.caught/entry.reached*100):0;
+    rows.push([d,entry.reached||0,entry.caught||0,pct+'%']);
+  }
+  downloadCSV('drawlab_survival_'+league.replace(/[^a-zA-Z0-9]/g,'_')+'.csv',rows);
+};
 
 function leaguesList(){ var s={}; state.matches.forEach(function(m){s[m.league]=1;}); return Object.keys(s).sort(); }
 function seasonsList(){ var s={}; state.matches.forEach(function(m){s[m.season]=1;}); return Object.keys(s).sort(); }
