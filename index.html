@@ -1280,20 +1280,119 @@ function runCrossLeague(){
     crossRes.sort(function(a,b){ return b.score-a.score; });
     _crossRes=crossRes; _crossLeagues=leagues;
     var tmLbl={all:'כל הקבוצות',excl2:'בלי 2 מוב',excl3:'בלי 3 מוב',excl4:'בלי 4 מוב',only2:'רק 2 מוב',only3:'רק 3 מוב',only4:'רק 4 מוב'};
-    // שמות ליגות מקוצרים
     var lgShort = {E0:'🏴󠁧󠁢󠁥󠁮󠁧󠁿 אנג',SP1:'🇪🇸 ספר',I1:'🇮🇹 איט',D1:'🇩🇪 גרמ',F1:'🇫🇷 צרפ'};
+
+    // ===== מדד יציבות (שכנים) =====
+    // בנה map לחיפוש מהיר: key -> score
+    var scoreMap = {};
+    crossRes.forEach(function(r){
+      scoreMap[r.t+'|'+r.ml+'|'+r.tm+'|'+(r.bl?1:0)] = r.score;
+    });
+    var ML_LIST = []; for(var _si=0;_si<=20;_si++) ML_LIST.push(_si);
+    var TH_LIST = []; for(var _ti=0;_ti<=20;_ti++) TH_LIST.push(_ti);
+    var TM_LIST = ['all','excl2','excl3','excl4','only2','only3','only4'];
+    // סדר עצירה לשכנות: [0,3,5] → 0↔3, 3↔5
+    var ML_ADJ = {0:[3],3:[0,5],5:[3]};
+    crossRes.forEach(function(r){
+      var neighbors = [];
+      // שכן בסף (הפרש 1)
+      if(r.t>0)  { var k=(r.t-1)+'|'+r.ml+'|'+r.tm+'|'+(r.bl?1:0); if(scoreMap[k]!==undefined) neighbors.push(scoreMap[k]); }
+      if(r.t<20) { var k=(r.t+1)+'|'+r.ml+'|'+r.tm+'|'+(r.bl?1:0); if(scoreMap[k]!==undefined) neighbors.push(scoreMap[k]); }
+      // שכן בעצירה (ML_ADJ)
+      var adjML = ML_ADJ[r.ml]||[];
+      adjML.forEach(function(nml){ var k=r.t+'|'+nml+'|'+r.tm+'|'+(r.bl?1:0); if(scoreMap[k]!==undefined) neighbors.push(scoreMap[k]); });
+      // שכן במובילות (כל שינוי ערך יחיד)
+      TM_LIST.forEach(function(ntm){
+        if(ntm===r.tm) return;
+        var k=r.t+'|'+r.ml+'|'+ntm+'|'+(r.bl?1:0);
+        if(scoreMap[k]!==undefined) neighbors.push(scoreMap[k]);
+      });
+      // שכן במאוזנות
+      var nbl = r.bl?0:1;
+      var kb = r.t+'|'+r.ml+'|'+r.tm+'|'+nbl;
+      if(scoreMap[kb]!==undefined) neighbors.push(scoreMap[kb]);
+      r.stability = neighbors.length>0 ? Math.round(neighbors.reduce(function(a,b){return a+b;},0)/neighbors.length) : r.score;
+    });
+
+    // ===== משפחות: קיבוץ שילובים 60+ לפי tm+bl+קטגוריית יחס =====
+    var families = {};
+    crossRes.forEach(function(r){
+      if(r.score < 60) return;
+      var famKey = r.tm + '|' + (r.bl?1:0);
+      if(!families[famKey]) families[famKey] = {tm:r.tm, bl:r.bl, members:[]};
+      families[famKey].members.push(r);
+    });
+
+    // ===== מיון חדש: לפי משפחה ואז יעילות גרועה =====
+    // בנה מפתח משפחה לכל שילוב (למיון)
+    var famKeyOf = {};
+    Object.keys(families).forEach(function(fk){
+      families[fk].members.forEach(function(r){ famKeyOf[r.t+'|'+r.ml+'|'+r.tm+'|'+(r.bl?1:0)] = fk; });
+      // ציון ממוצע למשפחה
+      var ms = families[fk].members;
+      families[fk].avgScore = Math.round(ms.reduce(function(a,r){return a+r.score;},0)/ms.length);
+    });
+    // מיין השילובים: משפחות חזקות קודם, בתוך משפחה לפי worstEff יורד ואז רווח
+    var sortedCross = crossRes.slice().sort(function(a,b){
+      var fkA = famKeyOf[a.t+'|'+a.ml+'|'+a.tm+'|'+(a.bl?1:0)];
+      var fkB = famKeyOf[b.t+'|'+b.ml+'|'+b.tm+'|'+(b.bl?1:0)];
+      var avgA = fkA ? families[fkA].avgScore : (a.score>=60?a.score:0);
+      var avgB = fkB ? families[fkB].avgScore : (b.score>=60?b.score:0);
+      if(avgA !== avgB) return avgB - avgA;
+      var wA = a.worstEff !== null ? a.worstEff : -999;
+      var wB = b.worstEff !== null ? b.worstEff : -999;
+      if(wA !== wB) return wB - wA;
+      return b.score - a.score;
+    });
+
     var h='<div style="margin-top:18px;border-top:1px solid #2a5a46;padding-top:16px">';
     h+='<div class="chead" style="margin-bottom:10px"><span class="num" style="background:#f2b70522;color:#f2b705">🌍</span><h2 style="font-size:17px">השוואה בין ליגות — ציון עקביות</h2></div>';
     h+='<p class="lead" style="margin-bottom:12px">נבדקו <strong>'+crossRes.length.toLocaleString()+'</strong> שילובים על <strong>'+leagues.length+'</strong> ליגות. הציון מעניש חוסר עקביות — שילוב נמדד לפי הליגה הגרועה שלו.</p>';
-    h+='<div class="rtable-wrap"><table class="rtable"><tr><th>#</th><th>ציון</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>כניסות</th><th>יעילות גרועה</th>';
+
+    // ===== תצוגת משפחות =====
+    var famList = Object.keys(families).sort(function(a,b){ return families[b].avgScore - families[a].avgScore; });
+    if(famList.length === 0){
+      h+='<div class="risknote" style="border-color:#f2b705;margin-bottom:12px">לא נמצאו תבניות יציבות בהיקף זה (אף שילוב לא קיבל 60+).</div>';
+    } else {
+      h+='<div style="margin-bottom:14px">';
+      h+='<div style="font-weight:700;color:#f2b705;font-size:13px;margin-bottom:8px">👨‍👩‍👧 משפחות שילובים (60+)</div>';
+      h+='<div class="rtable-wrap"><table class="rtable"><tr><th>משפחה</th><th>ציון ממוצע</th><th>כמה שילובים</th><th>ספים</th><th>עצירות</th><th>תגית</th></tr>';
+      famList.forEach(function(fk){
+        var fam = families[fk];
+        var ms = fam.members;
+        var ths = ms.map(function(r){return r.t;});
+        var mls = ms.map(function(r){return r.ml;});
+        var thMin=Math.min.apply(null,ths), thMax=Math.max.apply(null,ths);
+        var mlMin=Math.min.apply(null,mls), mlMax=Math.max.apply(null,mls);
+        var thStr = thMin===thMax ? 'סף '+thMin : 'ספים '+thMin+'–'+thMax;
+        var mlStr = mlMin===mlMax ? 'עצירה '+mlMin : 'עצירה '+mlMin+'–'+mlMax;
+        var tag = ms.length>=4 ? '<span style="color:#3dd68c;font-size:11px;font-weight:700">✔ תבנית יציבה</span>' : ms.length===1 ? '<span style="color:#ff8a5c;font-size:11px;font-weight:700">⚠ תוצאה בודדת</span>' : '<span style="color:#f2b705;font-size:11px">מבטיח</span>';
+        var famDesc = esc(tmLbl[fam.tm]||fam.tm) + (fam.bl?' ⚖️':' רגיל');
+        var avgColor = fam.avgScore>=60?'color:#3dd68c;font-weight:900':'color:#f2b705;font-weight:700';
+        h+='<tr><td>'+famDesc+'</td><td style="'+avgColor+'">'+fam.avgScore+'</td><td>'+ms.length+'</td><td>'+esc(thStr)+'</td><td>'+esc(mlStr)+'</td><td>'+tag+'</td></tr>';
+      });
+      h+='</table></div>';
+      h+='<div class="risknote" style="margin-top:8px;margin-bottom:12px">💡 <strong>משפחה עם הרבה שילובים מוצלחים = תבנית אמיתית ששרדה וריאציות.</strong> שילוב בודד ללא שכנים מוצלחים = כנראה מזל. בחר את השילוב הפשוט ביותר מתוך המשפחה החזקה ביותר.</div>';
+      h+='</div>';
+    }
+
+    // ===== טבלת שילובים מפורטת =====
+    h+='<div class="rtable-wrap"><table class="rtable"><tr><th>#</th><th>ציון</th><th>יציבות</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>כניסות</th><th>יעילות גרועה</th>';
     leagues.forEach(function(lg){ h+='<th style="font-size:10px">'+esc(lgShort[lg]||lg)+'</th>'; });
     h+='</tr>';
-    crossRes.slice(0,15).forEach(function(r,i){
+    sortedCross.slice(0,20).forEach(function(r,i){
       var scoreColor = r.score>=60?'color:#3dd68c;font-weight:900':r.score>=30?'color:#f2b705;font-weight:700':'color:#ff8a5c;font-weight:700';
       var scoreBg = r.score>=60?'background:#0a2e1e':r.score>=30?'background:#1a180a':'background:#2a0f11';
+      // יציבות: אדום אם פער גדול מ-25
+      var stabColor;
+      if(r.stability >= 60) stabColor = 'color:#3dd68c;font-weight:700';
+      else if(r.stability >= 30) stabColor = 'color:#f2b705;font-weight:700';
+      else stabColor = 'color:#ff8a5c;font-weight:700';
+      if(r.score - r.stability >= 25) stabColor = 'color:#ff8a5c;font-weight:900;background:#3a0f0f';
       h+='<tr style="'+scoreBg+'">';
       h+='<td>'+(i+1)+'</td>';
       h+='<td style="'+scoreColor+'">'+r.score+'</td>';
+      h+='<td style="'+stabColor+'">'+r.stability+'</td>';
       h+='<td class="sea">'+r.t+'</td>';
       h+='<td>'+r.ml+'</td>';
       h+='<td>'+esc(tmLbl[r.tm])+(r.bl?' ⚖️':'')+'</td>';
@@ -1310,7 +1409,7 @@ function runCrossLeague(){
     });
     h+='</table></div>';
     h+='<button onclick="window._exportCross(_crossRes,_crossLeagues)" style="margin-top:10px;padding:7px 14px;border-radius:8px;border:1px solid #2a5a46;background:#0d2e23;color:#f2b705;cursor:pointer;font-family:inherit;font-weight:700;font-size:13px">📥 ייצוא כל השילובים CSV ('+crossRes.length.toLocaleString()+')</button>';
-    h+='<div class="risknote" style="margin-top:12px">🎯 <strong>איך לקרוא את הציון:</strong> ציון = 100 × בטיחות × מובהקות × יעילות_בליגה_הגרועה. <strong style="color:#3dd68c">60+</strong> = עקבי, בטוח ומבוסס. <strong style="color:#f2b705">30–59</strong> = מבטיח אך לא מספיק עקבי. <strong style="color:#ff8a5c">מתחת ל-30</strong> = לא עקבי. שילוב עם ציון גבוה כאן כדאי לאמת על עונה שלישית כשתתווסף. — (מקפה) = פחות מכניסה אחת בליגה זו עם הפרמטרים הנוכחיים.</div>';
+    h+='<div class="risknote" style="margin-top:12px">🎯 <strong>איך לקרוא את הציון:</strong> ציון = 100 × בטיחות × מובהקות × יעילות_בליגה_הגרועה. <strong style="color:#3dd68c">60+</strong> עקבי · <strong style="color:#f2b705">30–59</strong> מבטיח · <strong style="color:#ff8a5c">מתחת 30</strong> לא עקבי. <strong>יציבות</strong> = ממוצע ציון השכנים — ציון גבוה ביציבות נמוכה (פער 25+) אדום = תוצאה בודדת שהשכנים לא תומכים בה.</div>';
     h+='</div>';
     crossOut.innerHTML=h;
   }
