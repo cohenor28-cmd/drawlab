@@ -1023,7 +1023,7 @@ function runLab(){
       var thi=idx%TH.length;
       var bl=BL[bi], tm=TM[tmi], ml=ML[mli], t=TH[thi];
       var pl=0, cy=0, se=0, bu=0, mx=0, mc=0, tb=0, en=0;
-      entries.forEach(function(e){
+      _labEntries.forEach(function(e){
         var topList = tm.startsWith("excl")||tm.startsWith("only") ?
           (tm.endsWith("2")?e.top2:tm.endsWith("3")?e.top3:e.top4) : [];
         if(tm.startsWith("excl") && topList.indexOf(e.team)>=0) return;
@@ -1042,7 +1042,7 @@ function runLab(){
     if(prog) prog.textContent='מריץ שילובים… '+pct+'%';
     if(done<total){ setTimeout(runChunk,0); return; }
     // סיים — רנדר תוצאות
-    res.sort(function(a,b){
+    _labRes.sort(function(a,b){
       var sa=(a.se===0&&a.bu===0)?1:0, sb=(b.se===0&&b.bu===0)?1:0;
       if(sa!==sb) return sb-sa;
       return b.pl-a.pl;
