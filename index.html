@@ -302,7 +302,7 @@ function renderPinned(){
   }
   sec.classList.remove('hidden');
   var curLeague=state.leagueFilter+"|"+state.seasonFilter;
-  var h='<div class="rtable-wrap"><table class="rtable"><tr><th>סף</th><th>עצירה</th><th>מובילות</th><th>יחס</th><th>מאוזנות</th>';
+  var h='<div class="rtable-wrap"><table class="rtable"><tr><th>סף</th><th>עצירה</th><th>מובילות</th><th>מאוזנות</th>';
   // הוסף עמודות לכל ליגה שנבדקה
   var allLeagues=[];
   state.pinnedCombos.forEach(function(p){ p.results.forEach(function(r){ if(allLeagues.indexOf(r.league)<0) allLeagues.push(r.league); }); });
@@ -311,7 +311,7 @@ function renderPinned(){
   state.pinnedCombos.forEach(function(p,pi){
     var isActive=p.results.some(function(r){return r.league===curLeague;});
     h+='<tr class="pinned-row'+(isActive?' active-league':'')+'">';
-    h+='<td class="sea">'+p.t+'</td><td>'+p.ml+'</td><td>'+esc(p.tm)+'</td><td>'+esc(p.od)+'</td><td>'+esc(p.bl)+'</td>';
+    h+='<td class="sea">'+p.t+'</td><td>'+p.ml+'</td><td>'+esc(p.tm)+'</td><td>'+esc(p.bl)+'</td>';
     allLeagues.forEach(function(lg){
       var res=p.results.find(function(r){return r.league===lg;});
       if(res){
@@ -1006,30 +1006,20 @@ function runLab(){
   var ML=[0,3,5,8,10,12,14,16,18,20,22,25];
   // TM: all / excl2 / excl3 / excl4 / only2 / only3 / only4
   var TM=["all","excl2","excl3","excl4","only2","only3","only4"];
-  var OD=["any","above3","low3","sweet","high"], BL=[false,true];
-  var total=TH.length*ML.length*TM.length*OD.length*BL.length;
+  var BL=[false,true];
+  var total=TH.length*ML.length*TM.length*BL.length;
   var res=[], done=0;
-  function oddsRangeOfEx(od){
-    if(od==="above3") return [3.0,99];
-    if(od==="low3") return [3.0,3.1];
-    if(od==="sweet") return [3.0,3.3];
-    if(od==="high") return [3.3,3.8];
-    return null;
-  }
   function runChunk(){
     var chunkSize=500, count=0;
     while(done<total && count<chunkSize){
       var idx=done;
-      var bi=Math.floor(idx/(TH.length*ML.length*TM.length*OD.length));
-      idx-=bi*(TH.length*ML.length*TM.length*OD.length);
-      var oi=Math.floor(idx/(TH.length*ML.length*TM.length));
-      idx-=oi*(TH.length*ML.length*TM.length);
+      var bi=Math.floor(idx/(TH.length*ML.length*TM.length));
+      idx-=bi*(TH.length*ML.length*TM.length);
       var tmi=Math.floor(idx/(TH.length*ML.length));
       idx-=tmi*(TH.length*ML.length);
       var mli=Math.floor(idx/TH.length);
       var thi=idx%TH.length;
-      var bl=BL[bi], od=OD[oi], tm=TM[tmi], ml=ML[mli], t=TH[thi];
-      var rng=oddsRangeOfEx(od);
+      var bl=BL[bi], tm=TM[tmi], ml=ML[mli], t=TH[thi];
       var pl=0, cy=0, se=0, bu=0, mx=0, mc=0;
       entries.forEach(function(e){
         var topList = tm.startsWith("excl")||tm.startsWith("only") ?
@@ -1038,11 +1028,10 @@ function runLab(){
         if(tm.startsWith("only") && topList.indexOf(e.team)<0) return;
         var opts={threshold:t, base:state.base, oddsMode:state.oddsMode,
           fixedOdds:state.fixedOdds, cap:state.cap, minGamesLeft:ml, seasonAware:true, balanced:bl};
-        if(rng){ opts.oddsLo=rng[0]; opts.oddsHi=rng[1]; }
         var r=simulate(e.seq,opts);
         pl+=r.pl; cy+=r.cyclesWon; se+=r.seasonEndBusts; bu+=r.busts; mc+=r.missedCatches; if(r.maxStake>mx)mx=r.maxStake;
       });
-      res.push({t:t,ml:ml,tm:tm,od:od,bl:bl,pl:Math.round(pl),cy:cy,se:se,bu:bu,mc:mc,mx:mx});
+      res.push({t:t,ml:ml,tm:tm,bl:bl,pl:Math.round(pl),cy:cy,se:se,bu:bu,mc:mc,mx:mx});
       done++; count++;
     }
     var pct=Math.round(done/total*100);
@@ -1056,16 +1045,15 @@ function runLab(){
       return b.pl-a.pl;
     });
     var tmLbl={all:"כל הקבוצות",excl2:"בלי 2 מוב",excl3:"בלי 3 מוב",excl4:"בלי 4 מוב",only2:"רק 2 מוב",only3:"רק 3 מוב",only4:"רק 4 מוב"};
-    var odLbl={any:"הכל",above3:"3.0+",low3:"3.0–3.1",sweet:"3.0–3.3",high:"3.3–3.8"};
     var curLeague=state.leagueFilter+"|"+state.seasonFilter;
     var h='<p class="lead" style="margin-top:14px">נבדקו <strong>'+res.length.toLocaleString()+'</strong> שילובים על '+entries.length+' קבוצות־עונה. מדורג: קודם שילובים בטוחים (0 פשיטות, 0 היתקעויות), ואז לפי רווח.</p>';
-    h+='<div class="rtable-wrap"><table class="rtable" id="labResTable"><tr><th>📌</th><th>#</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>יחס</th><th>מאוזנות</th><th>רווח</th><th>תפיסות</th><th>נתקע</th><th>פשיטות</th><th>סונן</th></tr>';
+    h+='<div class="rtable-wrap"><table class="rtable" id="labResTable"><tr><th>📌</th><th>#</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>מאוזנות</th><th>רווח</th><th>תפיסות</th><th>נתקע</th><th>פשיטות</th><th>סונן</th></tr>';
     res.slice(0,20).forEach(function(r,i){
       var safe=r.se===0&&r.bu===0;
-      var key=r.t+"|"+r.ml+"|"+r.tm+"|"+r.od+"|"+r.bl;
+      var key=r.t+"|"+r.ml+"|"+r.tm+"|"+r.bl;
       var pinned=state.pinnedCombos.some(function(p){return p.key===key;});
-      h+='<tr><td><input type="checkbox" class="pin-cb" data-key="'+key+'" data-t="'+r.t+'" data-ml="'+r.ml+'" data-tm="'+esc(tmLbl[r.tm])+'" data-od="'+esc(odLbl[r.od])+'" data-bl="'+(r.bl?"כן":"—")+'" data-pl="'+r.pl+'" data-cy="'+r.cy+'" data-se="'+r.se+'" data-bu="'+r.bu+'" data-mc="'+r.mc+'" '+(pinned?"checked":"")+' /></td>';
-      h+='<td>'+(i+1)+'</td><td class="sea">'+r.t+'</td><td>'+r.ml+'</td><td>'+tmLbl[r.tm]+'</td><td>'+odLbl[r.od]+'</td><td>'+(r.bl?"כן":"—")+'</td>'+
+      h+='<tr><td><input type="checkbox" class="pin-cb" data-key="'+key+'" data-t="'+r.t+'" data-ml="'+r.ml+'" data-tm="'+esc(tmLbl[r.tm])+'" data-bl="'+(r.bl?"כן":"—")+'" data-pl="'+r.pl+'" data-cy="'+r.cy+'" data-se="'+r.se+'" data-bu="'+r.bu+'" data-mc="'+r.mc+'" '+(pinned?"checked":"")+' /></td>';
+      h+='<td>'+(i+1)+'</td><td class="sea">'+r.t+'</td><td>'+r.ml+'</td><td>'+tmLbl[r.tm]+'</td><td>'+(r.bl?"כן":"—")+'</td>'+
          '<td class="'+(r.pl>=0?"":"hot")+'" style="'+(safe&&r.pl>0?"color:#3dd68c;font-weight:800":"")+'">'+( r.pl>=0?"+":"")+fmt(r.pl)+'</td>'+
          '<td>'+r.cy+'</td><td class="'+(r.se>0?"hot":"")+'">' +r.se+'</td><td class="'+(r.bu>0?"hot":"")+'">' +r.bu+'</td><td class="'+(r.mc>0?"hot":"")+'">' +r.mc+'</td></tr>';
     });
@@ -1079,7 +1067,7 @@ function runLab(){
         if(cb.checked){
           var existing=state.pinnedCombos.find(function(p){return p.key===d.key;});
           if(!existing){
-            state.pinnedCombos.push({key:d.key,t:d.t,ml:d.ml,tm:d.tm,od:d.od,bl:d.bl,
+            state.pinnedCombos.push({key:d.key,t:d.t,ml:d.ml,tm:d.tm,bl:d.bl,
               results:[{league:curLeague,pl:d.pl,cy:d.cy,se:d.se,bu:d.bu,mc:d.mc}]});
           } else {
             // הוסף תוצאה לליגה הנוכחית אם לא קיימת
