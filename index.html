@@ -757,7 +757,7 @@ function updateDataInfo(){
     var top4 = top4map[league+"|"+season] || {};
     var top4names = Object.keys(top4);
     var hasTop4 = top4names.length===4;
-    if(!leagueSummary[league]) leagueSummary[league]={ seasons:0, games:0, draws:0, maxStreaks:[], streaksOver10:0, gamesNo4:0, drawsNo4:0, maxStreaksNo4:[] };
+    if(!leagueSummary[league]) leagueSummary[league]={ seasons:0, games:0, draws:0, maxStreaks:[], streaksOver10:0, gamesNo4:0, drawsNo4:0, maxStreaksNo4:[], survivalDepths:[] };
     var ls=leagueSummary[league];
     ls.seasons++;
     ls.games+=v.games; ls.draws+=v.draws;
@@ -774,6 +774,26 @@ function updateDataInfo(){
     });
     ls.maxStreaks.push(maxStreak);
     ls.streaksOver10+=streaksOver10;
+    // עקומת הישרדות: לכל קבוצה, עקוב אחרי רצפים ותפיסות
+    Object.keys(v.teamMatches).forEach(function(team){
+      var arr=v.teamMatches[team], depth=0;
+      arr.forEach(function(e){
+        if(!e.isDraw){
+          depth++;
+          // הגיע לעומק depth
+          while(ls.survivalDepths.length<=depth) ls.survivalDepths.push({reached:0,caught:0});
+          ls.survivalDepths[depth].reached++;
+        } else {
+          if(depth>0){
+            // תפיסה בעומק depth
+            while(ls.survivalDepths.length<=depth) ls.survivalDepths.push({reached:0,caught:0});
+            ls.survivalDepths[depth].caught++;
+          }
+          depth=0;
+        }
+      });
+      // סוף עונה — רצף שלא נתפס (לא נספר כ-caught)
+    });
     // בלי מובילות
     if(hasTop4){
       var gNo4=0, dNo4=0, mxNo4=0;
@@ -818,6 +838,31 @@ function updateDataInfo(){
     '</tr>';
   });
   vh+='</table></div><p style="font-size:11.5px;color:#5f7a6d;margin-top:8px">🟡 צהוב = אחוז תיקו גבוה במיוחד | 🔴 אדום = רצפים מעל 10 גבוהים | הליגות מדורגות לפי אחוז תיקו יורד</p>';
+
+  // עקומת הישרדות רצפים לכל ליגה
+  vh+='<div class="verify-h" style="margin-top:18px;border-top:1px solid #1e4a38;padding-top:14px">📉 עקומת הישרדות רצפים לפי ליגה (ללא מסננים)</div>';
+  vh+='<p style="font-size:11.5px;color:#5f7a6d;margin-top:4px;margin-bottom:8px">לכל עומק: כמה רצפים הגיעו לשם, ואיזה אחוז מהם הסתיים בתיקו. עומק 1 = משחק ראשון ברצף. הטבלה מציגה עומקים 1–12.</p>';
+  leagueOrder.forEach(function(league){
+    var ls=leagueSummary[league];
+    var sd=ls.survivalDepths||[];
+    vh+='<div style="margin-bottom:14px"><strong style="color:#e8f0ea;font-size:13px">'+esc(league)+'</strong>';
+    vh+='<div class="rtable-wrap"><table class="rtable" style="margin-top:6px"><tr><th>עומק</th>';
+    for(var d=1;d<=12;d++) vh+='<th>'+d+'</th>';
+    vh+='</tr><tr><td style="color:#8fa99b;font-size:11px">הגיעו</td>';
+    for(var d=1;d<=12;d++){
+      var entry=sd[d]||{reached:0,caught:0};
+      vh+='<td>'+(entry.reached||0)+'</td>';
+    }
+    vh+='</tr><tr><td style="color:#8fa99b;font-size:11px">תפיסה %</td>';
+    for(var d=1;d<=12;d++){
+      var entry=sd[d]||{reached:0,caught:0};
+      var pct=entry.reached>0?Math.round(entry.caught/entry.reached*100):0;
+      var col=pct>=30?'color:#3dd68c;font-weight:700':pct>=20?'color:#f2b705':'color:#ff8a5c';
+      vh+='<td style="'+col+'">'+pct+'%</td>';
+    }
+    vh+='</tr></table></div></div>';
+  });
+  vh+='<p style="font-size:11px;color:#5f7a6d">🟢 ירוק = 30%+ תפיסה | 🟡 צהוב = 20-29% | 🔴 אדום = מתחת ל-20% | עומק גבוה עם אחוז גבוה = שווה לחכות</p>';
 
   vh+='</div>'; el("verify").innerHTML=vh;
 }
@@ -1061,7 +1106,7 @@ function runLab(){
   // TM: all / excl2 / excl3 / excl4 / only2 / only3 / only4
   var TM=["all","excl2","excl3","excl4","only2","only3","only4"];
   var BL=[false,true];
-  var SL=[0,3,4,5,6]; // stopLoss: 0=ללא, 3,4,5,6
+  var SL=[0,3,4,5,6,8,10]; // stopLoss: 0=ללא, 3,4,5,6,8,10
   var total=TH.length*ML.length*TM.length*BL.length*SL.length;
   _labRes=[]; var done=0;
   function runChunk(){
@@ -1234,7 +1279,7 @@ function runCrossLeague(){
   var ML=[]; for(var _m=0;_m<=20;_m++) ML.push(_m);
   var TM=['all','excl2','excl3','excl4','only2','only3','only4'];
   var BL=[false,true];
-  var SL_C=[0,3,4,5,6]; // stopLoss
+  var SL_C=[0,3,4,5,6,8,10]; // stopLoss
   var total=TH.length*ML.length*TM.length*BL.length*SL_C.length;
   var crossRes=[]; var done=0;
 
