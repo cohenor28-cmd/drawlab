@@ -215,8 +215,12 @@
   <section class="card hidden" id="labSec">
     <div class="chead"><span class="num">07</span><h2>מעבדת אסטרטגיות — סריקת שילובים</h2></div>
     <p class="lead">מריץ עשרות שילובים של מסננים על <strong>כל הקבוצות</strong> בליגה/עונה שבחרת (לא רק קבוצה אחת): סף התחלה × הפסקה לפני סוף עונה × יחס ל־3 המובילות. מדרג לפי רווח, ומסמן שילובים מסוכנים.</p>
-    <button class="btn primary" id="labRunBtn">🔬 הרץ סריקת שילובים</button>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px">
+      <button class="btn primary" id="labRunBtn">🔬 הרץ סריקת שילובים</button>
+      <button class="btn" id="labCrossBtn" style="border-color:#f2b70566">🌍 השוואה בין ליגות</button>
+    </div>
     <div id="labOut"></div>
+    <div id="labCrossOut"></div>
   </section>
 
   <section class="card hidden" id="pinnedSec">
@@ -1106,6 +1110,158 @@ function runLab(){
   setTimeout(runChunk,0);
 }
 
+/* ===== השוואה בין ליגות ===== */
+function runCrossLeague(){
+  var crossOut = el('labCrossOut');
+  // בדוק שיש נתונים
+  if(!state.matches.length){ crossOut.innerHTML='<p class="lead">אין נתונים — טען קבצי CSV קודם.</p>'; return; }
+  // מצא את כל הליגות בנתונים
+  var leaguesSet = {};
+  state.matches.forEach(function(m){ leaguesSet[m.league]=1; });
+  var leagues = Object.keys(leaguesSet).sort();
+  if(leagues.length < 2){
+    crossOut.innerHTML='<p class="lead" style="color:#ff8a5c">⚠️ נדרשות לפחות 2 ליגות בנתונים. כרגע יש רק '+leagues.length+'. טען את כל 25 הקבצים (5 ליגות × 5 עונות).</p>';
+    return;
+  }
+  crossOut.innerHTML='<p class="lead" id="crossProgress">מריץ השוואה בין '+leagues.length+' ליגות… 0%</p>';
+
+  // בנה _labEntries לכל הנתונים (ללא מסנן ליגה/עונה)
+  var allMatches = state.matches;
+  var byLgAll = {};
+  allMatches.forEach(function(m){
+    byLgAll[m.league] = byLgAll[m.league] || {};
+    (byLgAll[m.league][m.season] = byLgAll[m.league][m.season] || []).push(m);
+  });
+  var topNmapAll = {};
+  Object.keys(byLgAll).forEach(function(lg){
+    var seasons = Object.keys(byLgAll[lg]).sort();
+    for(var i=0;i<seasons.length;i++){
+      var src = i>0 ? byLgAll[lg][seasons[i-1]] : byLgAll[lg][seasons[i]];
+      [2,3,4].forEach(function(n){
+        topNmapAll[lg+'|'+seasons[i]+'|'+n] = standingsTop(src,n);
+      });
+    }
+  });
+  var gAll = groupLS(allMatches);
+  var entriesAll = [];
+  Object.keys(gAll).forEach(function(k){
+    var ms = gAll[k], teams = {};
+    ms.forEach(function(m){ teams[m.home]=1; teams[m.away]=1; });
+    var lg=ms[0].league, sn=ms[0].season;
+    Object.keys(teams).forEach(function(t){
+      entriesAll.push({
+        team:t, lg:lg, sn:sn,
+        top2: topNmapAll[lg+'|'+sn+'|2']||[],
+        top3: topNmapAll[lg+'|'+sn+'|3']||[],
+        top4: topNmapAll[lg+'|'+sn+'|4']||[],
+        seq: ms.filter(function(m){return m.home===t||m.away===t;})
+      });
+    });
+  });
+
+  // פרמטרים — זהים ל-runLab
+  var TH=[]; for(var _t=0;_t<=20;_t++) TH.push(_t);
+  var ML=[]; for(var _m=0;_m<=20;_m++) ML.push(_m);
+  var TM=['all','excl2','excl3','excl4','only2','only3','only4'];
+  var BL=[false,true];
+  var total=TH.length*ML.length*TM.length*BL.length;
+  var crossRes=[]; var done=0;
+
+  function runCrossChunk(){
+    var chunkSize=300, count=0;
+    while(done<total && count<chunkSize){
+      var idx=done;
+      var bi=Math.floor(idx/(TH.length*ML.length*TM.length));
+      idx-=bi*(TH.length*ML.length*TM.length);
+      var tmi=Math.floor(idx/(TH.length*ML.length));
+      idx-=tmi*(TH.length*ML.length);
+      var mli=Math.floor(idx/TH.length);
+      var thi=idx%TH.length;
+      var bl=BL[bi], tm=TM[tmi], ml=ML[mli], t=TH[thi];
+
+      // חשב לכל ליגה בנפרד
+      var perLeague = {};
+      leagues.forEach(function(lg){
+        var pl=0, mx=0, en=0, bu=0, se=0;
+        entriesAll.forEach(function(e){
+          if(e.lg !== lg) return;
+          var topList = (tm.startsWith('excl')||tm.startsWith('only')) ?
+            (tm.endsWith('2')?e.top2:tm.endsWith('3')?e.top3:e.top4) : [];
+          if(tm.startsWith('excl') && topList.indexOf(e.team)>=0) return;
+          if(tm.startsWith('only') && topList.indexOf(e.team)<0) return;
+          var opts={threshold:t,base:state.base,oddsMode:state.oddsMode,
+            fixedOdds:state.fixedOdds,cap:state.cap,minGamesLeft:ml,seasonAware:true,balanced:bl};
+          var r=simulate(e.seq,opts);
+          pl+=r.pl; if(r.maxStake>mx) mx=r.maxStake;
+          en+=r.entries; bu+=r.busts; se+=r.seasonEndBusts;
+        });
+        // חשב יעילות רק אם יש כניסות
+        var eff = (en>0 && mx>0) ? pl/mx : null;
+        perLeague[lg] = {pl:Math.round(pl), mx:mx, en:en, bu:bu, se:se, eff:eff};
+      });
+
+      // חשב ציון משוקלל
+      // בטיחות: 1/(1+incidents) — כולל כל הליגות
+      var totalBusts=0, totalSe=0, totalEn=0;
+      leagues.forEach(function(lg){ totalBusts+=perLeague[lg].bu; totalSe+=perLeague[lg].se; totalEn+=perLeague[lg].en; });
+      var incidents = totalBusts + totalSe;
+      var safety = 1/(1+incidents);
+      // מובהקות: min(1, totalEntries/20)
+      var conf = Math.min(1, totalEn/20);
+      // יעילות בליגה הגרועה — רק ליגות עם כניסות
+      var effs = leagues.map(function(lg){ return perLeague[lg].eff; }).filter(function(e){ return e !== null; });
+      var leaguesWithEntries = effs.length;
+      var worstEff = leaguesWithEntries>0 ? Math.min.apply(null,effs) : 0;
+      var effNorm = Math.max(0, Math.min(1, worstEff/2));
+      var score = Math.round(100 * safety * conf * effNorm);
+
+      crossRes.push({t:t,ml:ml,tm:tm,bl:bl,score:score,perLeague:perLeague,totalEn:totalEn,worstEff:worstEff,incidents:incidents,leaguesWithEntries:leaguesWithEntries});
+      done++; count++;
+    }
+    var pct=Math.round(done/total*100);
+    var prog=el('crossProgress');
+    if(prog) prog.textContent='מריץ השוואה בין '+leagues.length+' ליגות… '+pct+'%';
+    if(done<total){ setTimeout(runCrossChunk,0); return; }
+
+    // סיים — מיין לפי ציון יורד
+    crossRes.sort(function(a,b){ return b.score-a.score; });
+    var tmLbl={all:'כל הקבוצות',excl2:'בלי 2 מוב',excl3:'בלי 3 מוב',excl4:'בלי 4 מוב',only2:'רק 2 מוב',only3:'רק 3 מוב',only4:'רק 4 מוב'};
+    // שמות ליגות מקוצרים
+    var lgShort = {E0:'🏴󠁧󠁢󠁥󠁮󠁧󠁿 אנג',SP1:'🇪🇸 ספר',I1:'🇮🇹 איט',D1:'🇩🇪 גרמ',F1:'🇫🇷 צרפ'};
+    var h='<div style="margin-top:18px;border-top:1px solid #2a5a46;padding-top:16px">';
+    h+='<div class="chead" style="margin-bottom:10px"><span class="num" style="background:#f2b70522;color:#f2b705">🌍</span><h2 style="font-size:17px">השוואה בין ליגות — ציון עקביות</h2></div>';
+    h+='<p class="lead" style="margin-bottom:12px">נבדקו <strong>'+crossRes.length.toLocaleString()+'</strong> שילובים על <strong>'+leagues.length+'</strong> ליגות. הציון מעניש חוסר עקביות — שילוב נמדד לפי הליגה הגרועה שלו.</p>';
+    h+='<div class="rtable-wrap"><table class="rtable"><tr><th>#</th><th>ציון</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>כניסות</th><th>יעילות גרועה</th>';
+    leagues.forEach(function(lg){ h+='<th style="font-size:10px">'+esc(lgShort[lg]||lg)+'</th>'; });
+    h+='</tr>';
+    crossRes.slice(0,15).forEach(function(r,i){
+      var scoreColor = r.score>=60?'color:#3dd68c;font-weight:900':r.score>=30?'color:#f2b705;font-weight:700':'color:#ff8a5c;font-weight:700';
+      var scoreBg = r.score>=60?'background:#0a2e1e':r.score>=30?'background:#1a180a':'background:#2a0f11';
+      h+='<tr style="'+scoreBg+'">';
+      h+='<td>'+(i+1)+'</td>';
+      h+='<td style="'+scoreColor+'">'+r.score+'</td>';
+      h+='<td class="sea">'+r.t+'</td>';
+      h+='<td>'+r.ml+'</td>';
+      h+='<td>'+esc(tmLbl[r.tm])+(r.bl?' ⚖️':'')+'</td>';
+      h+='<td class="'+(r.totalEn<15?'hot':'')+'">'+r.totalEn+'</td>';
+      h+='<td>'+(r.worstEff!==null?(r.worstEff>=0?'+':'')+r.worstEff.toFixed(2)+'x':'—')+'</td>';
+      leagues.forEach(function(lg){
+        var ldata=r.perLeague[lg];
+        if(!ldata || ldata.en===0){ h+='<td style="color:#5f7a6d">—</td>'; return; }
+        var safe=ldata.bu===0&&ldata.se===0;
+        var plColor = (safe&&ldata.pl>0)?'color:#3dd68c;font-weight:800':(ldata.pl<0?'color:#ff8a5c':'');
+        h+='<td style="'+plColor+'">'+(ldata.pl>=0?'+':'')+fmt(ldata.pl)+'<br><span style="font-size:9px;color:#5f7a6d">'+ldata.en+'כ'+(ldata.bu>0?' '+ldata.bu+'פ':'')+(ldata.se>0?' '+ldata.se+'נ':'')+'</span></td>';
+      });
+      h+='</tr>';
+    });
+    h+='</table></div>';
+    h+='<div class="risknote" style="margin-top:12px">🎯 <strong>איך לקרוא את הציון:</strong> ציון = 100 × בטיחות × מובהקות × יעילות_בליגה_הגרועה. <strong style="color:#3dd68c">60+</strong> = עקבי, בטוח ומבוסס. <strong style="color:#f2b705">30–59</strong> = מבטיח אך לא מספיק עקבי. <strong style="color:#ff8a5c">מתחת ל-30</strong> = לא עקבי. שילוב עם ציון גבוה כאן כדאי לאמת על עונה שלישית כשתתווסף. — (מקפה) = פחות מכניסה אחת בליגה זו עם הפרמטרים הנוכחיים.</div>';
+    h+='</div>';
+    crossOut.innerHTML=h;
+  }
+  setTimeout(runCrossChunk,0);
+}
+
 /* ===== קישור אירועים ===== */
 function bind(){
   el("autoBtn").addEventListener("click", autoFetch);
@@ -1126,6 +1282,7 @@ function bind(){
   el("drawerClose").addEventListener("click", function(){ el("statsDrawer").classList.add("hidden"); });
   el("statsDrawer").addEventListener("click", function(e){ if(e.target.id==="statsDrawer") el("statsDrawer").classList.add("hidden"); });
   el("labRunBtn").addEventListener("click", runLab);
+  el("labCrossBtn").addEventListener("click", runCrossLeague);
   el("clearPinnedBtn").addEventListener("click", function(){
     if(confirm('למחוק את כל השילובים השמורים?')){
       state.pinnedCombos=[];
