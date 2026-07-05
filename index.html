@@ -529,14 +529,22 @@ function simulate(seq, o){
   var seen={}, remainAfter=new Array(seq.length), seenBefore=new Array(seq.length);
   for(var q=0;q<seq.length;q++){ var sq=seq[q].season; seen[sq]=(seen[sq]||0)+1; remainAfter[q]=sizes[sq]-seen[sq]; seenBefore[q]=seen[sq]-1; }
   // חשב אחוז תיקו לקבוצה לפי עונה קודמת בלבד (מניעת דליפת מידע)
+  // אם o.prevDrawPct קיים (מעבר מ-runLab) — שימוש בו ישירות לכל העונות
+  var _externalPrevDp = (o.prevDrawPct !== undefined) ? o.prevDrawPct : undefined;
   var seasonList=Object.keys(sizes).sort();
-  var prevSeasonDrawPct={}; // season -> drawPct של העונה הקודמת
-  for(var _si=0;_si<seasonList.length;_si++){
-    if(_si===0){ prevSeasonDrawPct[seasonList[_si]]=null; continue; } // אין עונה קודמת
-    var prevSn=seasonList[_si-1];
-    var prevG=0, prevD=0;
-    seq.forEach(function(m){ if(m.season===prevSn){ prevG++; if(m.isDraw) prevD++; } });
-    prevSeasonDrawPct[seasonList[_si]]=prevG>0?prevD/prevG:null;
+  var prevSeasonDrawPct={};
+  if(_externalPrevDp !== undefined){
+    // סריקה רגילה: seq מכיל עונה אחת — שימוש בערך החיצוני
+    seasonList.forEach(function(sn){ prevSeasonDrawPct[sn]=_externalPrevDp; });
+  } else {
+    // סימולטור ידני או השוואה בין ליגות: seq מכיל מספר עונות — חשב מכל עונה קודמת
+    for(var _si=0;_si<seasonList.length;_si++){
+      if(_si===0){ prevSeasonDrawPct[seasonList[_si]]=null; continue; }
+      var prevSn=seasonList[_si-1];
+      var prevG=0, prevD=0;
+      seq.forEach(function(m){ if(m.season===prevSn){ prevG++; if(m.isDraw) prevD++; } });
+      prevSeasonDrawPct[seasonList[_si]]=prevG>0?prevD/prevG:null;
+    }
   }
   var noDraw=0, betting=false, stake=o.base, pl=0, maxStake=0, busts=0, cyclesWon=0, lr=0, mlr=0, seasonEndBusts=0, missedCatches=0, equity=[], totalBets=0, entries=0, stopLossExits=0, stopLossLocked=0;
   var slCount=0; // מונה הפסדות רצופות בתוך רצף פעיל
@@ -1178,17 +1186,34 @@ function runLab(){
       });
     }
   });
+  // בנה מפה של עונות ממוינות לפי ליגה מכל הנתונים (לא רק scope)
+  var allByLg={};
+  state.matches.forEach(function(m){
+    allByLg[m.league]=allByLg[m.league]||{};
+    (allByLg[m.league][m.season]=allByLg[m.league][m.season]||[]).push(m);
+  });
   var g=groupLS(scope); _labEntries=[];
   Object.keys(g).forEach(function(k){
     var ms=g[k], teams={};
     ms.forEach(function(m){ teams[m.home]=1; teams[m.away]=1; });
     var lg=ms[0].league, sn=ms[0].season;
+    // מצא עונה קודמת לחישוב prevDrawPct
+    var lgSeasons=allByLg[lg]?Object.keys(allByLg[lg]).sort():[];
+    var snIdx=lgSeasons.indexOf(sn);
+    var prevSn=snIdx>0?lgSeasons[snIdx-1]:null;
     Object.keys(teams).forEach(function(t){
+      // חשב prevDrawPct מעונה קודמת
+      var prevDrawPct=null;
+      if(prevSn && allByLg[lg][prevSn]){
+        var prevMs=allByLg[lg][prevSn].filter(function(m){return m.home===t||m.away===t;});
+        if(prevMs.length>0) prevDrawPct=prevMs.filter(function(m){return m.isDraw;}).length/prevMs.length;
+      }
       _labEntries.push({
         team:t, lg:lg, sn:sn,
         top2: topNmap[lg+"|"+sn+"|2"] || [],
         top3: topNmap[lg+"|"+sn+"|3"] || [],
         top4: topNmap[lg+"|"+sn+"|4"] || [],
+        prevDrawPct: prevDrawPct,
         seq: ms.filter(function(m){return m.home===t||m.away===t;})
       });
     });
@@ -1230,7 +1255,7 @@ function runLab(){
         if(tm.startsWith("excl") && topList.indexOf(e.team)>=0) return;
         if(tm.startsWith("only") && topList.indexOf(e.team)<0) return;
         var opts={threshold:t, base:state.base, oddsMode:state.oddsMode,
-          fixedOdds:state.fixedOdds, cap:state.cap, minGamesLeft:ml, seasonAware:true, balanced:bl, filterMode:'perMatch', stopLoss:sl, seasonSkipFirst:sf, seasonSkipLast:slast, minDrawPct:dp};
+          fixedOdds:state.fixedOdds, cap:state.cap, minGamesLeft:ml, seasonAware:true, balanced:bl, filterMode:'perMatch', stopLoss:sl, seasonSkipFirst:sf, seasonSkipLast:slast, minDrawPct:dp, prevDrawPct:e.prevDrawPct};
         var r=simulate(e.seq,opts);
         pl+=r.pl; cy+=r.cyclesWon; se+=r.seasonEndBusts; bu+=r.busts; mc+=r.missedCatches; if(r.maxStake>mx)mx=r.maxStake; tb+=r.totalBets; en+=r.entries; sle+=r.stopLossExits;
       });
