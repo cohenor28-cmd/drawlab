@@ -132,6 +132,13 @@
   .rtable .hot{color:#ff8a5c;font-weight:800;}
   .risknote{font-size:12.5px;color:#a8c0b3;background:#0d2e23;border:1px solid #2a5a46;border-radius:10px;padding:11px 13px;margin:14px 0 4px;}
   .risknote strong{color:#f2b705;}
+  .pin-cb{width:16px;height:16px;accent-color:#f2b705;cursor:pointer;}
+  #pinnedSec{margin-top:18px;border-top:1px solid #2a5a46;padding-top:14px;}
+  #pinnedSec h3{font-size:14px;color:#f2b705;margin:0 0 8px;}
+  .pinned-row td{background:#0d2e23;}
+  .pinned-row.active-league td{background:#0a2e1e;border-right:3px solid #3dd68c;}
+  .pin-del{background:none;border:none;color:#e5484d;cursor:pointer;font-size:14px;padding:0 4px;}
+  .pin-league-tag{font-size:10px;color:#5f7a6d;display:block;}
   #statsFab{position:fixed;right:10px;top:44%;z-index:50;width:52px;height:52px;border-radius:50%;
     border:1px solid #2a5a46;background:#123a2d;font-size:22px;box-shadow:0 4px 16px rgba(0,0,0,.45);cursor:pointer;}
   .drawer{position:fixed;inset:0;z-index:60;background:rgba(4,14,11,.72);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:18px 10px;}
@@ -212,6 +219,13 @@
     <div id="labOut"></div>
   </section>
 
+  <section class="card hidden" id="pinnedSec">
+    <div class="chead"><span class="num" style="background:#f2b705;color:#082019">📌</span><h2>שילובים שמורים להשוואה</h2></div>
+    <p class="lead">סמן שילובים בולטים מהסריקה כדי לשמור אותם כאן. הנתונים נשמרים גם אחרי רענון. בחר ליגה/עונה שונה, הרץ סריקה — ותוכל לראות איך אותו שילוב מתפקד בהקשרים שונים.</p>
+    <div id="pinnedTableWrap"><p class="lead" style="color:#5f7a6d">אין שילובים שמורים עדיין.</p></div>
+    <button class="btn" id="clearPinnedBtn" style="margin-top:8px;color:#e5484d;border-color:#e5484d44">🗑 נקה הכל</button>
+  </section>
+
   <section class="reality">
     <div class="reality-h">🎯 מה לחפש בתוצאות</div>
     <p>שים לב לפער בין <strong>אחוז התיקו האמיתי</strong> לבין מה שהיחס מגלם (1 חלקי היחס). אם קבוצה עושה תיקו ב־30% אבל היחס מגלם רק 27% — שם מסתתר יתרון. ההכפלה עצמה לא יוצרת יתרון; היא רק מזיזה מתי ההפסד מגיע. עמודה "מרוויחה" שצבועה אדום = אשליה, כי בדרך פשטת את הרגל.</p>
@@ -265,8 +279,60 @@ var TARGET_FILES = [
 
 /* ===== state ===== */
 var state = { matches:[], sources:[], team:"", leagueFilter:"ALL", seasonFilter:"ALL",
-  base:10, fixedOdds:3, oddsMode:"fixed", threshold:0, cap:5000, minGamesLeft:0, seasonAware:true, oddsRange:"any", balanced:false };
+  base:10, fixedOdds:3, oddsMode:"fixed", threshold:0, cap:5000, minGamesLeft:0, seasonAware:true, oddsRange:"any", balanced:false,
+  pinnedCombos:[] };
 var storageOK = true;
+
+function savePinned(){
+  try{ localStorage.setItem('drawlab_pinned', JSON.stringify(state.pinnedCombos)); }catch(e){}
+}
+function loadPinned(){
+  try{
+    var s=localStorage.getItem('drawlab_pinned');
+    if(s) state.pinnedCombos=JSON.parse(s);
+  }catch(e){}
+}
+function renderPinned(){
+  var sec=el('pinnedSec'), wrap=el('pinnedTableWrap');
+  if(!sec) return;
+  if(!state.pinnedCombos.length){
+    sec.classList.remove('hidden');
+    wrap.innerHTML='<p class="lead" style="color:#5f7a6d">אין שילובים שמורים עדיין.</p>';
+    return;
+  }
+  sec.classList.remove('hidden');
+  var curLeague=state.leagueFilter+"|"+state.seasonFilter;
+  var h='<div class="rtable-wrap"><table class="rtable"><tr><th>סף</th><th>עצירה</th><th>מובילות</th><th>יחס</th><th>מאוזנות</th>';
+  // הוסף עמודות לכל ליגה שנבדקה
+  var allLeagues=[];
+  state.pinnedCombos.forEach(function(p){ p.results.forEach(function(r){ if(allLeagues.indexOf(r.league)<0) allLeagues.push(r.league); }); });
+  allLeagues.forEach(function(lg){ h+='<th style="font-size:10px;max-width:60px;word-break:break-all">'+esc(lg.replace('|','\n'))+'</th>'; });
+  h+='<th>מחק</th></tr>';
+  state.pinnedCombos.forEach(function(p,pi){
+    var isActive=p.results.some(function(r){return r.league===curLeague;});
+    h+='<tr class="pinned-row'+(isActive?' active-league':'')+'">';
+    h+='<td class="sea">'+p.t+'</td><td>'+p.ml+'</td><td>'+esc(p.tm)+'</td><td>'+esc(p.od)+'</td><td>'+esc(p.bl)+'</td>';
+    allLeagues.forEach(function(lg){
+      var res=p.results.find(function(r){return r.league===lg;});
+      if(res){
+        var safe=res.se==0&&res.bu==0;
+        h+='<td style="'+(safe&&res.pl>0?'color:#3dd68c;font-weight:800':res.pl<0?'color:#ff8a5c':'')+'">'+(res.pl>=0?"+":"")+fmt(res.pl)+'<br><span style="font-size:9px;color:#5f7a6d">ת:'+res.cy+' נ:'+res.se+' פ:'+res.bu+'</span></td>';
+      } else {
+        h+='<td style="color:#5f7a6d">—</td>';
+      }
+    });
+    h+='<td><button class="pin-del" data-pi="'+pi+'">✕</button></td></tr>';
+  });
+  h+='</table></div>';
+  wrap.innerHTML=h;
+  wrap.querySelectorAll('.pin-del').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var pi=Number(btn.dataset.pi);
+      state.pinnedCombos.splice(pi,1);
+      savePinned(); renderPinned();
+    });
+  });
+}
 
 /* ===== עזרים ===== */
 function fmt(n){ return new Intl.NumberFormat("he-IL",{maximumFractionDigits:0}).format(n); }
@@ -991,17 +1057,42 @@ function runLab(){
     });
     var tmLbl={all:"כל הקבוצות",excl2:"בלי 2 מוב",excl3:"בלי 3 מוב",excl4:"בלי 4 מוב",only2:"רק 2 מוב",only3:"רק 3 מוב",only4:"רק 4 מוב"};
     var odLbl={any:"הכל",above3:"3.0+",low3:"3.0–3.1",sweet:"3.0–3.3",high:"3.3–3.8"};
+    var curLeague=state.leagueFilter+"|"+state.seasonFilter;
     var h='<p class="lead" style="margin-top:14px">נבדקו <strong>'+res.length.toLocaleString()+'</strong> שילובים על '+entries.length+' קבוצות־עונה. מדורג: קודם שילובים בטוחים (0 פשיטות, 0 היתקעויות), ואז לפי רווח.</p>';
-    h+='<div class="rtable-wrap"><table class="rtable"><tr><th>#</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>יחס</th><th>מאוזנות</th><th>רווח</th><th>תפיסות</th><th>נתקע</th><th>פשיטות</th><th>סונן</th></tr>';
+    h+='<div class="rtable-wrap"><table class="rtable" id="labResTable"><tr><th>📌</th><th>#</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>יחס</th><th>מאוזנות</th><th>רווח</th><th>תפיסות</th><th>נתקע</th><th>פשיטות</th><th>סונן</th></tr>';
     res.slice(0,20).forEach(function(r,i){
       var safe=r.se===0&&r.bu===0;
-      h+='<tr><td>'+(i+1)+'</td><td class="sea">'+r.t+'</td><td>'+r.ml+'</td><td>'+tmLbl[r.tm]+'</td><td>'+odLbl[r.od]+'</td><td>'+(r.bl?"כן":"—")+'</td>'+
+      var key=r.t+"|"+r.ml+"|"+r.tm+"|"+r.od+"|"+r.bl;
+      var pinned=state.pinnedCombos.some(function(p){return p.key===key;});
+      h+='<tr><td><input type="checkbox" class="pin-cb" data-key="'+key+'" data-t="'+r.t+'" data-ml="'+r.ml+'" data-tm="'+esc(tmLbl[r.tm])+'" data-od="'+esc(odLbl[r.od])+'" data-bl="'+(r.bl?"כן":"—")+'" data-pl="'+r.pl+'" data-cy="'+r.cy+'" data-se="'+r.se+'" data-bu="'+r.bu+'" data-mc="'+r.mc+'" '+(pinned?"checked":"")+' /></td>';
+      h+='<td>'+(i+1)+'</td><td class="sea">'+r.t+'</td><td>'+r.ml+'</td><td>'+tmLbl[r.tm]+'</td><td>'+odLbl[r.od]+'</td><td>'+(r.bl?"כן":"—")+'</td>'+
          '<td class="'+(r.pl>=0?"":"hot")+'" style="'+(safe&&r.pl>0?"color:#3dd68c;font-weight:800":"")+'">'+( r.pl>=0?"+":"")+fmt(r.pl)+'</td>'+
          '<td>'+r.cy+'</td><td class="'+(r.se>0?"hot":"")+'">' +r.se+'</td><td class="'+(r.bu>0?"hot":"")+'">' +r.bu+'</td><td class="'+(r.mc>0?"hot":"")+'">' +r.mc+'</td></tr>';
     });
     h+='</table></div>';
     h+='<div class="risknote">🧭 <strong>איך להשתמש בזה נכון (שלב 3 שלך):</strong> שילוב שמנצח כאן עדיין לא הוכיח כלום. קח את 2–3 המובילים, החלף ליגה או עונה בתפריט למעלה, והרץ שוב. שילוב אמיתי ישרוד את המעבר; שילוב מקרי יקרוס. המסנן נקבע לפי הטבלה הסופית של <strong>העונה הקודמת</strong>.</div>';
     out.innerHTML=h;
+    // קשר אירועי checkbox
+    out.querySelectorAll('.pin-cb').forEach(function(cb){
+      cb.addEventListener('change',function(){
+        var d=cb.dataset;
+        if(cb.checked){
+          var existing=state.pinnedCombos.find(function(p){return p.key===d.key;});
+          if(!existing){
+            state.pinnedCombos.push({key:d.key,t:d.t,ml:d.ml,tm:d.tm,od:d.od,bl:d.bl,
+              results:[{league:curLeague,pl:d.pl,cy:d.cy,se:d.se,bu:d.bu,mc:d.mc}]});
+          } else {
+            // הוסף תוצאה לליגה הנוכחית אם לא קיימת
+            if(!existing.results.some(function(r){return r.league===curLeague;})){
+              existing.results.push({league:curLeague,pl:d.pl,cy:d.cy,se:d.se,bu:d.bu,mc:d.mc});
+            }
+          }
+        } else {
+          state.pinnedCombos=state.pinnedCombos.filter(function(p){return p.key!==d.key;});
+        }
+        savePinned(); renderPinned();
+      });
+    });
   }
   setTimeout(runChunk,0);
 }
@@ -1026,6 +1117,12 @@ function bind(){
   el("drawerClose").addEventListener("click", function(){ el("statsDrawer").classList.add("hidden"); });
   el("statsDrawer").addEventListener("click", function(e){ if(e.target.id==="statsDrawer") el("statsDrawer").classList.add("hidden"); });
   el("labRunBtn").addEventListener("click", runLab);
+  el("clearPinnedBtn").addEventListener("click", function(){
+    if(confirm('למחוק את כל השילובים השמורים?')){
+      state.pinnedCombos=[];
+      savePinned(); renderPinned();
+    }
+  });
 }
 function softRefresh(){
   if(!(state.team && state.matches.length)) return;
@@ -1036,12 +1133,14 @@ function softRefresh(){
 /* ===== init ===== */
 function init(){
   loadState();
+  loadPinned();
   el("baseIn").value=state.base; el("capIn").value=state.cap; el("fixedOddsIn").value=state.fixedOdds;
   el("oddsModeSel").value=state.oddsMode; el("threshRange").value=state.threshold;
   el("minLeftIn").value=state.minGamesLeft; el("seasonAwareSel").value=state.seasonAware?"1":"0";
   el("oddsRangeSel").value=state.oddsRange; el("balancedSel").value=state.balanced?"1":"0";
   bind();
   afterData();
+  renderPinned();
 }
 init();
 </script>
