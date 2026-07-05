@@ -1087,31 +1087,47 @@ function runLab(){
     });
     var tmLbl={all:"כל הקבוצות",excl2:"בלי 2 מוב",excl3:"בלי 3 מוב",excl4:"בלי 4 מוב",only2:"רק 2 מוב",only3:"רק 3 מוב",only4:"רק 4 מוב"};
     var curLeague=state.leagueFilter+"|"+state.seasonFilter;
-    _labSortMode='profit';
+    _labSortMode='score';
+    // חשב ציון לכל שילוב בסריקה הרגילה (ליגה/עונה בודדת)
+    _labRes.forEach(function(r){
+      var incidents=r.bu+r.se;
+      var safety=1/(1+incidents);
+      var conf=Math.min(1, r.en/20);
+      var effVal=r.mx>0?r.pl/r.mx:0;
+      var effNorm=Math.max(0,Math.min(1,effVal/2));
+      r.score=Math.round(100*safety*conf*effNorm);
+    });
     function renderLabTable(sortBy){
       var sorted=_labRes.slice().sort(function(a,b){
         var sa=(a.se===0&&a.bu===0)?1:0, sb=(b.se===0&&b.bu===0)?1:0;
         if(sa!==sb) return sb-sa;
+        if(sortBy==='score') return b.score-a.score;
         if(sortBy==='eff') return b.eff-a.eff;
         return b.pl-a.pl;
       });
-      var h2='<p class="lead" style="margin-top:14px">נבדקו <strong>'+_labRes.length.toLocaleString()+'</strong> שילובים על '+_labEntries.length+' קבוצות־עונה. מדורג: קודם שילובים בטוחים (0 פשיטות, 0 היתקעויות), ואז לפי '+(sortBy==='eff'?'רווח/חשיפה':'רווח')+'.</p>';
+      var h2='<p class="lead" style="margin-top:14px">נבדקו <strong>'+_labRes.length.toLocaleString()+'</strong> שילובים על '+_labEntries.length+' קבוצות־עונה. מדורג לפי: '+(sortBy==='score'?'ציון':sortBy==='eff'?'רווח/חשיפה':'רווח')+'.</p>';
       h2+='<div style="margin-bottom:8px;display:flex;gap:8px;justify-content:flex-end">';
+      h2+='<button onclick="window._labSort(\"score\")" style="padding:4px 10px;border-radius:6px;border:1px solid #2a5a46;background:'+(sortBy==='score'?'#f2b705':'#0d2b1e')+';color:'+(sortBy==='score'?'#082019':'#f2b705')+';cursor:pointer;font-size:12px">מיין לפי ציון</button>';
       h2+='<button onclick="window._labSort(\"profit\")" style="padding:4px 10px;border-radius:6px;border:1px solid #2a5a46;background:'+(sortBy==='profit'?'#f2b705':'#0d2b1e')+';color:'+(sortBy==='profit'?'#082019':'#f2b705')+';cursor:pointer;font-size:12px">מיין לפי רווח</button>';
       h2+='<button onclick="window._labSort(\"eff\")" style="padding:4px 10px;border-radius:6px;border:1px solid #2a5a46;background:'+(sortBy==='eff'?'#f2b705':'#0d2b1e')+';color:'+(sortBy==='eff'?'#082019':'#f2b705')+';cursor:pointer;font-size:12px">מיין לפי רווח/חשיפה</button>';
       h2+='</div>';
-      h2+='<div class="rtable-wrap"><table class="rtable" id="labResTable"><tr><th>📌</th><th>#</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>רווח</th><th>תפיסות</th><th>מס הימורים</th><th>כניסות</th><th>גבוה (שק)</th><th>רווח/חשיפה</th><th>נתקע</th><th>פשיטות</th><th>סונן</th></tr>';
+      h2+='<div class="rtable-wrap"><table class="rtable" id="labResTable"><tr><th>📌</th><th>#</th><th>ציון</th><th>סף</th><th>עצירה</th><th>מובילות</th><th>רווח</th><th>כניסות</th><th>גבוה (שק)</th><th>רווח/חשיפה</th><th>נתקע</th><th>פשיטות</th></tr>';
       sorted.slice(0,20).forEach(function(r,i){
         var safe=r.se===0&&r.bu===0;
         var key=r.t+"|"+r.ml+"|"+r.tm+"|"+r.bl;
         var pinned=state.pinnedCombos.some(function(p){return p.key===key;});
+        var scoreColor=r.score>=60?'color:#3dd68c;font-weight:900':r.score>=30?'color:#f2b705;font-weight:700':'color:#ff8a5c;font-weight:700';
+        var scoreBg=r.score>=60?'background:#0a2e1e':r.score>=30?'background:#1a180a':'background:#2a0f11';
         var effColor=(safe&&r.eff>1)?'color:#3dd68c;font-weight:800':'';
-        h2+='<tr><td><input type="checkbox" class="pin-cb" data-key="'+key+'" data-t="'+r.t+'" data-ml="'+r.ml+'" data-tm="'+esc(tmLbl[r.tm])+'" data-bl="'+(r.bl?"כן":"—")+'" data-pl="'+r.pl+'" data-cy="'+r.cy+'" data-se="'+r.se+'" data-bu="'+r.bu+'" data-mc="'+r.mc+'" data-tb="'+r.tb+'" data-mx="'+r.mx+'" '+(pinned?"checked":"")+' /></td>';
-        h2+='<td>'+(i+1)+'</td><td class="sea">'+r.t+'</td><td>'+r.ml+'</td><td>'+tmLbl[r.tm]+'</td>'+
-           '<td class="'+(r.pl>=0?"":"hot")+'" style="'+(safe&&r.pl>0?"color:#3dd68c;font-weight:800":"")+'">'+( r.pl>=0?"+":"")+fmt(r.pl)+'</td>'+
-           '<td>'+r.cy+'</td><td>'+r.tb.toLocaleString()+'</td><td class="'+(r.en<15?"hot":"")+'">'+r.en+'</td><td class="'+(r.mx>500?"hot":"")+'">'+fmt(r.mx)+'</td>'+
-           '<td style="'+effColor+'">'+(r.eff>0?r.eff+'x':'—')+'</td>'+
-           '<td class="'+(r.se>0?"hot":"")+'">'+r.se+'</td><td class="'+(r.bu>0?"hot":"")+'">'+r.bu+'</td><td class="'+(r.mc>0?"hot":"")+'">'+r.mc+'</td></tr>';
+        h2+='<tr style="'+scoreBg+'"><td><input type="checkbox" class="pin-cb" data-key="'+key+'" data-t="'+r.t+'" data-ml="'+r.ml+'" data-tm="'+esc(tmLbl[r.tm])+'" data-bl="'+(r.bl?"כן":"—")+'" data-pl="'+r.pl+'" data-cy="'+r.cy+'" data-se="'+r.se+'" data-bu="'+r.bu+'" data-mc="'+r.mc+'" data-tb="'+r.tb+'" data-mx="'+r.mx+'" data-en="'+r.en+'" '+(pinned?"checked":"")+' /></td>';
+        h2+='<td>'+(i+1)+'</td>';
+        h2+='<td style="'+scoreColor+'">'+r.score+'</td>';
+        h2+='<td class="sea">'+r.t+'</td><td>'+r.ml+'</td><td>'+tmLbl[r.tm]+'</td>';
+        h2+='<td class="'+(r.pl>=0?"":"hot")+'" style="'+(safe&&r.pl>0?"color:#3dd68c;font-weight:800":"")+'">'+( r.pl>=0?"+":"")+fmt(r.pl)+'</td>';
+        h2+='<td class="'+(r.en<15?"hot":"")+'">'+r.en+'</td>';
+        h2+='<td class="'+(r.mx>500?"hot":"")+'">'+fmt(r.mx)+'</td>';
+        h2+='<td style="'+effColor+'">'+(r.eff>0?r.eff+'x':'—')+'</td>';
+        h2+='<td class="'+(r.se>0?"hot":"")+'">'+r.se+'</td><td class="'+(r.bu>0?"hot":"")+'">'+r.bu+'</td></tr>';
       });
       h2+='</table></div>';
       h2+='<div class="risknote" style="margin-top:10px;border-color:#e5484d">⚠️ <strong>זהירות סטטיסטית:</strong> שילוב עם פחות מעשרה וחמשה כניסות (סומן באדום) לא הוכיח את עצמו סטטיסטית — מדגם קטן יכול להצליח במקרה. לפני הגדלת סכומות על שילוב נדיר, חובה לאמת אותו על ליגה ועונה אחרות ללא שינוי בהגדרות.</div>';
