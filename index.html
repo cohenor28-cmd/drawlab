@@ -149,6 +149,11 @@
   .lgtitle{font-family:'Rubik';font-weight:700;font-size:15px;color:#f2b705;margin-bottom:8px;}
   .lgline{font-size:13.5px;color:#c4d6cb;margin:3px 0;}
   .lgline strong{color:#e8f0ea;}
+
+  .adv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin:12px 0;}
+  .adv-actions{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0;}
+  .mini-note{font-size:12.5px;color:#8fa99b;background:#0d2e23;border:1px solid #143529;border-radius:10px;padding:10px 12px;margin:10px 0;}
+  .profit-pos{color:#3dd68c;font-weight:800}.profit-neg{color:#ff8a5c;font-weight:800}
 </style>
 </head>
 <body>
@@ -216,6 +221,29 @@
   <!-- 05 סורק -->
   <section class="card hidden" id="sweepSec"></section>
 
+
+  <!-- 06 אופטימייזר מתקדם -->
+  <section class="card hidden" id="advancedSec">
+    <div class="chead"><span class="num">06</span><h2>אופטימייזר הכפלות — קבוצה נבחרת</h2></div>
+    <p class="lead">בודק שילובי התחלה, סיום ומקדם הגדלה לקבוצה שנבחרה. אין כאן אפשרות של הימור אחד בלבד: הסיום חייב להיות גדול מההתחלה.</p>
+    <div class="adv-grid">
+      <label class="field"><span>התחלה מ־</span><input id="advStartMin" type="number" min="0" value="3" /></label>
+      <label class="field"><span>התחלה עד</span><input id="advStartMax" type="number" min="1" value="12" /></label>
+      <label class="field"><span>סיום מ־</span><input id="advEndMin" type="number" min="1" value="5" /></label>
+      <label class="field"><span>סיום עד</span><input id="advEndMax" type="number" min="2" value="15" /></label>
+      <label class="field"><span>מקדם מ־</span><input id="advMultMin" type="number" min="1" step="0.1" value="1.2" /></label>
+      <label class="field"><span>מקדם עד</span><input id="advMultMax" type="number" min="1" step="0.1" value="3.0" /></label>
+      <label class="field"><span>קפיצת מקדם</span><input id="advMultStep" type="number" min="0.01" step="0.01" value="0.2" /></label>
+      <label class="field"><span>יחס תיקו קבוע</span><input id="advOdds" type="number" min="1.1" step="0.1" value="3.0" /></label>
+      <label class="field"><span>הימור בסיס ₪</span><input id="advBase" type="number" min="1" value="10" /></label>
+    </div>
+    <div class="adv-actions">
+      <button class="btn primary" id="advRunBtn">🚀 הרץ אופטימיזציה</button>
+      <button class="btn" id="advCsvBtn">📥 ייצוא CSV</button>
+    </div>
+    <div id="advOut"></div>
+  </section>
+
   <!-- 07 מעבדת אסטרטגיות -->
   <section class="card hidden" id="labSec">
     <div class="chead"><span class="num">07</span><h2>מעבדת אסטרטגיות — סריקת שילובים</h2></div>
@@ -259,6 +287,12 @@ var HOME_ODDS_COLS = ["AvgH","B365H","PSH","PSCH","BbAvH","IWH","WHH","VCH","Max
 var AWAY_ODDS_COLS = ["AvgA","B365A","PSA","PSCA","BbAvA","IWA","WHA","VCA","MaxA"];
 var BASE_DATA_URL = 'https://cohenor28-cmd.github.io/drawlab/data/';
 var TARGET_FILES = [
+
+  {season:"2009/10", url:BASE_DATA_URL+"I1_0910.csv",   label:"איטליה 09/10"},
+  {season:"2010/11", url:BASE_DATA_URL+"I1_1011.csv",   label:"איטליה 10/11"},
+  {season:"2011/12", url:BASE_DATA_URL+"I1_1112.csv",   label:"איטליה 11/12"},
+  {season:"2012/13", url:BASE_DATA_URL+"I1_1213.csv",   label:"איטליה 12/13"},
+  {season:"2013/14", url:BASE_DATA_URL+"I1_1314.csv",   label:"איטליה 13/14"},
   {season:"2014/15", url:BASE_DATA_URL+"E0_1415.csv",   label:"אנגליה 14/15"},
   {season:"2014/15", url:BASE_DATA_URL+"SP1_1415.csv",  label:"ספרד 14/15"},
   {season:"2014/15", url:BASE_DATA_URL+"I1_1415.csv",   label:"איטליה 14/15"},
@@ -322,7 +356,7 @@ var state = { matches:[], sources:[], team:"", leagueFilter:"ALL", seasonFilter:
   pinnedCombos:[] };
 var storageOK = true;
 var _labRes=[], _labEntries=[], _labSortMode='profit';
-var _crossRes=[], _crossLeagues=[];
+var _crossRes=[], _crossLeagues=[], _advResults=[];
 
 function savePinned(){
   try{ localStorage.setItem('drawlab_pinned', JSON.stringify(state.pinnedCombos)); }catch(e){}
@@ -999,7 +1033,7 @@ function filteredMatches(){
 
 function refreshResults(){
   var hasTeam = state.team && state.matches.length;
-  ["statsSec","simSec","sweepSec"].forEach(function(id){ el(id).classList.toggle("hidden", !hasTeam); });
+  ["statsSec","simSec","sweepSec","advancedSec"].forEach(function(id){ el(id).classList.toggle("hidden", !hasTeam); });
   el("labSec").classList.toggle("hidden", !state.matches.length);
   if(!hasTeam) return;
   var stats=teamStats(filteredMatches(), state.team);
@@ -1702,6 +1736,8 @@ function bind(){
   el("drawerClose").addEventListener("click", function(){ el("statsDrawer").classList.add("hidden"); });
   el("statsDrawer").addEventListener("click", function(e){ if(e.target.id==="statsDrawer") el("statsDrawer").classList.add("hidden"); });
   el("labRunBtn").addEventListener("click", runLab);
+  el("advRunBtn").addEventListener("click", runAdvancedOptimizer);
+  el("advCsvBtn").addEventListener("click", exportAdvancedCSV);
   el("labCrossBtn").addEventListener("click", runCrossLeague);
   el("clearPinnedBtn").addEventListener("click", function(){
     if(confirm('למחוק את כל השילובים השמורים?')){

@@ -2,13 +2,18 @@
    גרסה זו מאפשרת עבודה אופליין ומבטיחה שעדכונים מ-Claude יופיעו מיד.
    כל פעם שמעלים גרסה חדשה — יש לשנות את CACHE_NAME (למשל v2, v3...).
 */
-const CACHE_NAME = 'drawlab-v38';
+const CACHE_NAME = 'drawlab-ai-backtest-v39';
 const ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png'
+  './',
+  './index.html',
+  './manifest.json',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './data/I1_0910.csv',
+  './data/I1_1011.csv',
+  './data/I1_1112.csv',
+  './data/I1_1213.csv',
+  './data/I1_1314.csv'
 ];
 
 /* התקנה: שמור את כל הנכסים במטמון */
