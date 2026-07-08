@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>DrawLab v44 Mobile Reality Lab</title>
+  <title>DrawLab v45 Mobile Research Core</title>
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#111827" />
   <style>
@@ -20,13 +20,33 @@
     .quickStatus{display:grid;grid-template-columns:1fr 1fr;gap:8px}.resultCards{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}.resultCard{border:1px solid var(--line);border-radius:18px;background:#0b1222;padding:12px}.resultCard .top{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px}.resultCard .id{font-weight:900;color:#dbeafe}.mini{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.mini div{border:1px solid #1f2a44;border-radius:13px;padding:8px;background:#081020}.mini span{display:block;font-size:10px;color:var(--muted)}.mini b{font-size:15px}.checkList{display:grid;gap:7px}.checkItem{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid var(--line);border-radius:14px;background:#0b1222;padding:9px 10px;font-size:13px}.checkItem b{font-size:12px}.ok{color:var(--good);font-weight:900}.fail{color:var(--bad);font-weight:900}.quickStatus .banner{min-height:62px}.stickyRun{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(7,11,22,.92);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom));display:none}.stickyRun .inner{max-width:560px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:8px}
     @media(min-width:760px){.wrap{max-width:980px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.grid3{grid-template-columns:repeat(3,minmax(0,1fr))}.stickyRun{display:none!important}}
     @media(max-width:759px){header{text-align:center}.stickyRun{display:block}.desktopRun{display:none}.card{margin:0 0 2px}h2{font-size:15px}.tablewrap{max-height:420px}}
+
+    /* v45 mobile clean-up */
+    .step{position:relative;padding-top:14px}
+    .step:before{content:attr(data-step);position:absolute;top:-12px;right:14px;background:linear-gradient(135deg,#0ea5e9,#22c55e);color:white;font-weight:900;border-radius:999px;padding:5px 10px;font-size:12px;box-shadow:0 6px 16px rgba(14,165,233,.25)}
+    .sectionHint{font-size:12px;color:#94a3b8;margin:-4px 0 10px;line-height:1.45}
+    details.advanced{margin-top:10px;border:1px solid var(--line);border-radius:16px;background:#0b1222;overflow:hidden}
+    details.advanced summary{cursor:pointer;list-style:none;padding:12px 14px;font-weight:850;color:#dbeafe}
+    details.advanced summary::-webkit-details-marker{display:none}
+    details.advanced .inside{padding:0 12px 12px}
+    .roadmapGrid{display:grid;grid-template-columns:1fr;gap:8px}.roadmapItem{border:1px solid var(--line);border-radius:16px;background:#0b1222;padding:10px;font-size:13px}.roadmapItem b{display:block;color:#dbeafe;margin-bottom:4px}
+    @media(max-width:759px){
+      body{font-size:15px;padding-bottom:96px}
+      header{padding:12px 10px} h1{font-size:18px}.sub{font-size:11px}
+      .wrap{padding:8px;gap:12px}.card{border-radius:18px;padding:14px 12px;margin:0}
+      .quickStatus{grid-template-columns:1fr}.row{grid-template-columns:1fr}.kpis{grid-template-columns:1fr 1fr}.mini{grid-template-columns:1fr 1fr}
+      select,input,button{min-height:52px;font-size:16px;border-radius:14px}label{font-size:12px;margin-top:2px}
+      .tablewrap{display:none}.resultCard{padding:13px}.stickyRun .inner{grid-template-columns:1.4fr .8fr}
+    }
+
   </style>
 </head>
 <body>
-<header><h1>DrawLab Mobile Reality Lab</h1><div class="sub">Train/Test כברירת מחדל · Walk‑Forward · בלי הצצה לעתיד</div></header>
+<header><h1>DrawLab Mobile Research Core</h1><div class="sub">Train/Test כברירת מחדל · Walk‑Forward · בלי הצצה לעתיד</div></header>
 <main class="wrap">
-  <section class="card">
+  <section class="card step" data-step="מערכת">
     <h2>סטטוס פיתוח</h2>
+    <div class="sectionHint">בדיקה מהירה שהמנועים עובדים לפני שמסתמכים על תוצאה.</div>
     <button class="secondary" id="systemCheckBtn" style="margin-bottom:10px">🧪 בדיקת מערכת</button>
     <div id="systemCheck" class="checkList hidden"></div>
     <div class="quickStatus">
@@ -37,8 +57,9 @@
     </div>
   </section>
 
-  <section class="card">
-    <h2>1) נתונים</h2>
+  <section class="card step" data-step="1">
+    <h2>נתונים</h2>
+    <div class="sectionHint">טען את קבצי העונות ובחר קבוצה. בלי נתונים אין הרצה.</div>
     <div class="grid">
       <button id="loadBuiltIn">טען איטליה 2009–2014</button>
       <input id="fileInput" type="file" accept=".csv" multiple />
@@ -47,8 +68,9 @@
     <div id="dataPills"></div>
   </section>
 
-  <section class="card">
-    <h2>2) הגדרות בדיקה</h2>
+  <section class="card step" data-step="2">
+    <h2>הגדרות בדיקה</h2>
+    <div class="sectionHint">ברירת המחדל היא Train/Test כדי למנוע התאמה לתוצאות ידועות.</div>
     <div class="grid">
       <div><label>קבוצה</label><select id="teamSelect"></select></div>
       <div><label>מצב בדיקה</label><select id="mode"><option value="traintest">Train/Test - ברירת מחדל</option><option value="walk">Walk-Forward</option><option value="research">Research בלבד - עלול להיות Overfitting</option></select></div>
@@ -59,8 +81,9 @@
     </div>
   </section>
 
-  <section class="card">
-    <h2>3) טווחי אופטימייזר</h2>
+  <section class="card step" data-step="3">
+    <h2>טווחי אופטימייזר</h2>
+    <div class="sectionHint">המערכת בודקת רק אסטרטגיות הכפלה אמיתיות — בלי הימור יחיד.</div>
     <div class="grid3">
       <div><label>התחלה מ־</label><input id="startMin" type="number" value="3" /></div>
       <div><label>התחלה עד</label><input id="startMax" type="number" value="12" /></div>
@@ -73,8 +96,9 @@
     <div class="row desktopRun" style="margin-top:10px"><button id="runBtn">🔍 הרץ בדיקה</button><button class="secondary" id="exportBtn">ייצוא CSV</button></div>
   </section>
 
-  <section class="card" id="resultsCard">
-    <h2>4) תוצאות</h2>
+  <section class="card step" data-step="4" id="resultsCard">
+    <h2>תוצאות</h2>
+    <div class="sectionHint">קודם מוצגים כרטיסים ברורים. טבלת CSV מלאה זמינה בייצוא.</div>
     <div id="modeWarning" class="banner warn">עוד לא הורצה בדיקה.</div>
     <div class="kpis" id="kpis"></div>
     <div id="resultCards" class="resultCards"></div>
@@ -82,11 +106,17 @@
     <div class="tablewrap" style="margin-top:10px"><table id="resultsTable"><thead></thead><tbody></tbody></table></div>
   </section>
 
-  <section class="card">
-    <h2>מה הוסר כדי למנוע בלבול?</h2>
-    <div class="banner good">הוסרו/הוסתרו מהגרסה הזו: סימולטור ישן, סריקה לפי כל העונות כברירת מחדל, “שילובים שמורים”, ומסכים שמדרגים לפי רווח היסטורי בלבד. נשאר רק מסלול מחקר נקי עם הפרדה בין Train ל־Test.</div>
+  <section class="card step" data-step="תכנון">
+    <h2>מה נשאר ומה הוסר?</h2>
+    <div class="banner good">הוסרו/הוסתרו: סימולטור ישן, סריקה לפי כל העונות כברירת מחדל, “שילובים שמורים”, וטבלאות שמדרגות לפי רווח היסטורי בלבד.</div>
+    <div class="roadmapGrid" style="margin-top:10px">
+      <div class="roadmapItem"><b>Data Engine</b>קורא CSV, מאחד עונות ומסדר כרונולוגית.</div>
+      <div class="roadmapItem"><b>Strategy Engine</b>מגדיר אסטרטגיה כפרמטרים ולא כקוד קשיח.</div>
+      <div class="roadmapItem"><b>Reality Guard</b>Train/Test ו־Walk‑Forward נגד Overfitting.</div>
+      <div class="roadmapItem"><b>Report Engine</b>כרטיסי תוצאה, CSV, ובהמשך דוח לפי עונות.</div>
+    </div>
   </section>
-</main><div class="stickyRun"><div class="inner"><button id="runBtnSticky">🔍 הרץ</button><button class="secondary" id="exportBtnSticky">ייצוא</button></div></div><div class="footer">v44 mobile reality lab</div>
+</main><div class="stickyRun"><div class="inner"><button id="runBtnSticky">🔍 הרץ</button><button class="secondary" id="exportBtnSticky">ייצוא</button></div></div><div class="footer">v45 mobile research core</div>
 <script>
 const BUILTIN=['data/I1_0910.csv','data/I1_1011.csv','data/I1_1112.csv','data/I1_1213.csv','data/I1_1314.csv'];
 let matches=[], seasons=[], lastRows=[];
@@ -114,6 +144,6 @@ function drawChart(eq){const c=$('chart'),ctx=c.getContext('2d');ctx.clearRect(0
 
 async function runSystemCheck(){const box=$('systemCheck');box.classList.remove('hidden');box.innerHTML='<div class="checkItem"><span>מריץ בדיקות...</span><b>⏳</b></div>';const out=[];function add(name,ok,msg=''){out.push({name,ok,msg});box.innerHTML=out.map(x=>`<div class="checkItem"><span>${x.name}<br><small class="muted">${x.msg}</small></span><b class="${x.ok?'ok':'fail'}">${x.ok?'עבר':'נכשל'}</b></div>`).join('')}try{if(!matches.length) await loadBuiltIn();add('טעינת נתוני CSV',matches.length>0,`${matches.length} משחקים`);add('זיהוי עונות',seasons.length>=2,`${seasons.length} עונות`);add('זיהוי קבוצות',!!$('teamSelect').value,$('teamSelect').value||'אין קבוצה');const st=strategies();add('יצירת אסטרטגיות',st.length>0,`${st.length} שילובים`);const team=$('teamSelect').value||'Juventus';const g=teamGames(team);add('משחקי קבוצה',g.length>0,`${team}: ${g.length} משחקים`);const sim=simulate(g,st[0]||{start:3,stop:5,mult:1.2,base:10,odds:3});add('מנוע Backtest',Number.isFinite(sim.profit),`רווח דוגמה: ${money(sim.profit)}`);const tt=runTrainTest(team);add('Train/Test',tt.length>0,`${tt.length} תוצאות`);const wf=runWalk(team);add('Walk-Forward',wf.length>0,`${wf.length} קיפולים`);add('הגנת הימור יחיד',st.every(x=>x.stop>x.start),'סיום תמיד גדול מהתחלה')}catch(e){add('שגיאה כללית',false,e.message||String(e))}}
 
-$('loadBuiltIn').onclick=loadBuiltIn;$('fileInput').onchange=e=>loadFiles(e.target.files);function runCurrent(){if(!matches.length)return alert('טען נתונים קודם');const team=$('teamSelect').value;const mode=$('mode').value;const rows=mode==='research'?runResearch(team):mode==='walk'?runWalk(team):runTrainTest(team);render(rows);$('resultsCard').scrollIntoView({behavior:'smooth',block:'start'});}function exportCurrent(){if(!lastRows.length)return;const keys=Object.keys(lastRows[0]).filter(k=>k!=='equity');const csv=[keys.join(','),...lastRows.map(r=>keys.map(k=>JSON.stringify(r[k]??'')).join(','))].join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='drawlab_results_v44.csv';a.click()}$('systemCheckBtn').onclick=runSystemCheck;$('runBtn').onclick=runCurrent;$('runBtnSticky').onclick=runCurrent;$('exportBtn').onclick=exportCurrent;$('exportBtnSticky').onclick=exportCurrent;if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js?v=44').catch(()=>{});
+$('loadBuiltIn').onclick=loadBuiltIn;$('fileInput').onchange=e=>loadFiles(e.target.files);function runCurrent(){if(!matches.length)return alert('טען נתונים קודם');const team=$('teamSelect').value;const mode=$('mode').value;const rows=mode==='research'?runResearch(team):mode==='walk'?runWalk(team):runTrainTest(team);render(rows);$('resultsCard').scrollIntoView({behavior:'smooth',block:'start'});}function exportCurrent(){if(!lastRows.length)return;const keys=Object.keys(lastRows[0]).filter(k=>k!=='equity');const csv=[keys.join(','),...lastRows.map(r=>keys.map(k=>JSON.stringify(r[k]??'')).join(','))].join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='drawlab_results_v45.csv';a.click()}$('systemCheckBtn').onclick=runSystemCheck;$('runBtn').onclick=runCurrent;$('runBtnSticky').onclick=runCurrent;$('exportBtn').onclick=exportCurrent;$('exportBtnSticky').onclick=exportCurrent;if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js?v=45').catch(()=>{});
 </script>
 </body></html>
