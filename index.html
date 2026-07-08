@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <link rel="manifest" href="/manifest.json" />
 <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-<title>מעבדת התיקו</title>
+<title>מעבדת התיקו v41</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;900&family=Assistant:wght@400;600;700&display=swap');
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -154,6 +154,14 @@
   .adv-actions{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0;}
   .mini-note{font-size:12.5px;color:#8fa99b;background:#0d2e23;border:1px solid #143529;border-radius:10px;padding:10px 12px;margin:10px 0;}
   .profit-pos{color:#3dd68c;font-weight:800}.profit-neg{color:#ff8a5c;font-weight:800}
+
+  .guard{background:#111f1a;border:1px solid #3dd68c55;border-radius:12px;padding:12px 14px;margin:12px 0;color:#c9f5e0;font-size:13.5px;}
+  .guard.warn{background:#241608;border-color:#c98a2b66;color:#f0d5a8;}
+  .guard.danger{background:#2a0f11;border-color:#e5484d66;color:#ffb4b4;}
+  .guard strong{color:#f2b705;}
+  .mode-pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 10px;background:#0d2e23;border:1px solid #2a5a46;color:#a8c0b3;font-size:12px;font-weight:800;margin:0 0 8px;}
+  .removed-note{font-size:12.5px;color:#8fa99b;background:#0d2e23;border:1px dashed #2a5a46;border-radius:10px;padding:10px 12px;margin-top:10px;}
+
 </style>
 </head>
 <body>
@@ -225,8 +233,11 @@
   <!-- 06 אופטימייזר מתקדם -->
   <section class="card hidden" id="advancedSec">
     <div class="chead"><span class="num">06</span><h2>אופטימייזר הכפלות — קבוצה נבחרת</h2></div>
-    <p class="lead">בודק שילובי התחלה, סיום ומקדם הגדלה לקבוצה שנבחרה. אין כאן אפשרות של הימור אחד בלבד: הסיום חייב להיות גדול מההתחלה.</p>
+    <p class="lead">בודק שילובי התחלה, סיום ומקדם הגדלה לקבוצה שנבחרה — עם <strong>Reality Guard</strong> שמונע התאמת יתר לעונות שכבר ידועות.</p>
+    <div class="guard">🛡️ <strong>ברירת המחדל היא Train/Test:</strong> האפליקציה בוחרת אסטרטגיות רק על עונות אימון, ואז בודקת אותן על עונות שלא שימשו לבחירה.</div>
     <div class="adv-grid">
+      <label class="field"><span>מצב בדיקה</span><select id="advValidationMode"><option value="trainTest" selected>Train/Test — מומלץ</option><option value="walkForward">Walk-Forward — הכי קרוב למציאות</option><option value="research">Research — מחקר בלבד, מסוכן להסקת מסקנות</option></select></label>
+      <label class="field"><span>כמה עונות ל־Train</span><input id="advTrainSeasons" type="number" min="1" max="10" value="3" /></label>
       <label class="field"><span>התחלה מ־</span><input id="advStartMin" type="number" min="0" value="3" /></label>
       <label class="field"><span>התחלה עד</span><input id="advStartMax" type="number" min="1" value="12" /></label>
       <label class="field"><span>סיום מ־</span><input id="advEndMin" type="number" min="1" value="5" /></label>
@@ -356,7 +367,7 @@ var state = { matches:[], sources:[], team:"", leagueFilter:"ALL", seasonFilter:
   pinnedCombos:[] };
 var storageOK = true;
 var _labRes=[], _labEntries=[], _labSortMode='profit';
-var _crossRes=[], _crossLeagues=[], _advResults=[];
+var _crossRes=[], _crossLeagues=[], _advResults=[], _advResultsObj=null;
 
 function savePinned(){
   try{ localStorage.setItem('drawlab_pinned', JSON.stringify(state.pinnedCombos)); }catch(e){}
@@ -1033,8 +1044,8 @@ function filteredMatches(){
 
 function refreshResults(){
   var hasTeam = state.team && state.matches.length;
-  ["statsSec","simSec","sweepSec","advancedSec"].forEach(function(id){ el(id).classList.toggle("hidden", !hasTeam); });
-  el("labSec").classList.toggle("hidden", !state.matches.length);
+  ["statsSec","advancedSec"].forEach(function(id){ el(id).classList.toggle("hidden", !hasTeam); });
+  ["simSec","sweepSec","labSec","pinnedSec"].forEach(function(id){ if(el(id)) el(id).classList.add("hidden"); });
   if(!hasTeam) return;
   var stats=teamStats(filteredMatches(), state.team);
   renderStats(stats);
@@ -1709,6 +1720,237 @@ window._exportPinned=function(){
   }));
   downloadCSV('drawlab_pinned.csv',rows);
 };
+
+
+
+/* ===== Core Strategy Engine v0.3 — Reality Guard: Research / Train-Test / Walk-Forward ===== */
+function strategyId(cfg){
+  return ['DRAW','S'+cfg.startStreak,'E'+cfg.stopStreak,'M'+Number(cfg.multiplier).toFixed(2),'B'+cfg.baseStake,'O'+Number(cfg.odds).toFixed(2)].join('-');
+}
+function buildDrawMartingaleStrategy(startStreak, stopStreak, multiplier, baseStake, odds){
+  return { id:'', market:'draw', streakType:'no_draw', startStreak:Number(startStreak), stopStreak:Number(stopStreak), multiplier:Number(multiplier), baseStake:Number(baseStake), odds:Number(odds), resetOnWin:true, lockUntilDrawAfterFail:true };
+}
+function candidateConfigs(params){
+  var out=[];
+  var sMin=Number(params.startMin), sMax=Number(params.startMax), eMin=Number(params.endMin), eMax=Number(params.endMax);
+  var mMin=Number(params.multMin), mMax=Number(params.multMax), mStep=Number(params.multStep);
+  var base=Number(params.base), odds=Number(params.odds);
+  for(var st=sMin; st<=sMax; st++){
+    for(var en=Math.max(eMin,st+1); en<=eMax; en++){
+      for(var mult=mMin; mult<=mMax+1e-9; mult+=mStep){
+        var mm=Math.round(mult*100)/100;
+        var cfg=buildDrawMartingaleStrategy(st,en,mm,base,odds);
+        cfg.id=strategyId(cfg);
+        out.push(cfg);
+      }
+    }
+  }
+  return out;
+}
+function maxDrawdownFromEquity(equity){
+  var peak=0, maxDD=0;
+  equity.forEach(function(v){ if(v>peak) peak=v; var dd=peak-v; if(dd>maxDD) maxDD=dd; });
+  return maxDD;
+}
+function seasonProfitTemplate(seq){ var out={}; seq.forEach(function(m){ if(out[m.season]===undefined) out[m.season]=0; }); return out; }
+function backtestStrategy(seq, cfg){
+  cfg.id = cfg.id || strategyId(cfg);
+  var noDraw=0, inSeries=false, locked=false, stake=cfg.baseStake, exposure=0;
+  var profit=0, totalStaked=0, totalBets=0, entries=0, wins=0, failed=0, maxStake=0, maxExposure=0;
+  var equity=[], bets=[], perSeason=seasonProfitTemplate(seq), curLosingSeries=0, maxLosingSeries=0;
+  for(var i=0;i<seq.length;i++){
+    var m=seq[i];
+    if(m.isDraw && locked){ locked=false; noDraw=0; equity.push(Math.round(profit)); continue; }
+    if(!inSeries && !locked && noDraw>=cfg.startStreak){ inSeries=true; stake=cfg.baseStake; exposure=0; entries++; }
+    if(inSeries){
+      if(noDraw>cfg.stopStreak){
+        failed++; curLosingSeries++; if(curLosingSeries>maxLosingSeries) maxLosingSeries=curLosingSeries;
+        inSeries=false; locked=true; stake=cfg.baseStake; exposure=0;
+      } else {
+        var betStake=stake;
+        totalBets++; totalStaked+=betStake; exposure+=betStake;
+        if(betStake>maxStake) maxStake=betStake;
+        if(exposure>maxExposure) maxExposure=exposure;
+        if(m.isDraw){
+          var win=betStake*(cfg.odds-1);
+          profit+=win; perSeason[m.season]=(perSeason[m.season]||0)+win;
+          wins++; curLosingSeries=0; inSeries=false; stake=cfg.baseStake; exposure=0;
+          bets.push({game:i+1,season:m.season,stake:betStake,result:'win',profit:Math.round(profit),streakBefore:noDraw});
+        } else {
+          profit-=betStake; perSeason[m.season]=(perSeason[m.season]||0)-betStake;
+          stake*=cfg.multiplier;
+          bets.push({game:i+1,season:m.season,stake:betStake,result:'loss',profit:Math.round(profit),streakBefore:noDraw});
+        }
+      }
+    }
+    equity.push(Math.round(profit));
+    noDraw = m.isDraw ? 0 : noDraw+1;
+    if(inSeries && !m.isDraw && noDraw>cfg.stopStreak){
+      failed++; curLosingSeries++; if(curLosingSeries>maxLosingSeries) maxLosingSeries=curLosingSeries;
+      inSeries=false; locked=true; stake=cfg.baseStake; exposure=0;
+    }
+  }
+  if(inSeries){ failed++; curLosingSeries++; if(curLosingSeries>maxLosingSeries) maxLosingSeries=curLosingSeries; }
+  var dd=maxDrawdownFromEquity(equity);
+  var roi=totalStaked>0 ? profit/totalStaked : 0;
+  return { id:cfg.id, start:cfg.startStreak, stop:cfg.stopStreak, multiplier:cfg.multiplier, base:cfg.baseStake, odds:cfg.odds,
+    profit:profit, roi:roi, totalStaked:totalStaked, entries:entries, wins:wins, failed:failed, hitRate:entries?wins/entries:0,
+    totalBets:totalBets, maxStake:maxStake, maxExposure:maxExposure, drawdown:dd, bankrollNeeded:dd, maxLosingSeries:maxLosingSeries,
+    perSeason:perSeason, equity:equity, bets:bets };
+}
+function scoreBacktestResult(r){
+  var profitPart=Math.max(-100,Math.min(100,(r.profit||0)/10));
+  var roiPart=Math.max(-50,Math.min(50,(r.roi||0)*100));
+  var riskPenalty=Math.min(120,(r.drawdown||0)/10 + (r.maxStake||0)/30 + (r.failed||0)*2);
+  return Math.round(profitPart + roiPart - riskPenalty);
+}
+function reliabilityScore(train,test){
+  if(!test) return 0;
+  var s=50;
+  if(test.profit>0) s+=20; else s-=20;
+  if(train && train.profit>0 && test.profit>0) s+=10;
+  if(train && train.profit>0 && test.profit<0) s-=18;
+  if(test.roi>0) s+=Math.min(15,test.roi*100); else s+=Math.max(-15,test.roi*100);
+  if(test.drawdown>0) s-=Math.min(20,test.drawdown/50);
+  var seasons=Object.keys(test.perSeason||{}), pos=0;
+  seasons.forEach(function(sn){ if((test.perSeason[sn]||0)>0) pos++; });
+  if(seasons.length) s += (pos/seasons.length)*15 - 5;
+  return Math.max(0,Math.min(100,Math.round(s)));
+}
+function splitSeqBySeasons(seq, trainCount){
+  var seasons=[]; seq.forEach(function(m){ if(seasons.indexOf(m.season)<0) seasons.push(m.season); });
+  seasons.sort();
+  trainCount=Math.max(1,Math.min(Number(trainCount)||1,seasons.length-1));
+  var trainSeasons=seasons.slice(0,trainCount), testSeasons=seasons.slice(trainCount);
+  return { seasons:seasons, trainSeasons:trainSeasons, testSeasons:testSeasons,
+    train:seq.filter(function(m){ return trainSeasons.indexOf(m.season)>=0; }),
+    test:seq.filter(function(m){ return testSeasons.indexOf(m.season)>=0; }) };
+}
+function scanResearch(seq, params){
+  var cfgs=candidateConfigs(params), out=[];
+  cfgs.forEach(function(cfg){ var r=backtestStrategy(seq,cfg); r.score=scoreBacktestResult(r); r.reliability=0; out.push(r); });
+  out.sort(function(a,b){ if(b.profit!==a.profit) return b.profit-a.profit; if(b.roi!==a.roi) return b.roi-a.roi; return a.drawdown-b.drawdown; });
+  return {mode:'research', rows:out};
+}
+function scanTrainTest(seq, params, trainCount){
+  var split=splitSeqBySeasons(seq, trainCount), cfgs=candidateConfigs(params), out=[];
+  cfgs.forEach(function(cfg){
+    var tr=backtestStrategy(split.train,cfg), te=backtestStrategy(split.test,cfg);
+    var row={ id:cfg.id, start:cfg.startStreak, stop:cfg.stopStreak, multiplier:cfg.multiplier, base:cfg.baseStake, odds:cfg.odds,
+      train:tr, test:te, profit:te.profit, roi:te.roi, totalStaked:te.totalStaked, entries:te.entries, wins:te.wins, failed:te.failed, hitRate:te.hitRate,
+      totalBets:te.totalBets, maxStake:te.maxStake, maxExposure:te.maxExposure, drawdown:te.drawdown, bankrollNeeded:te.bankrollNeeded,
+      maxLosingSeries:te.maxLosingSeries, perSeason:te.perSeason, equity:te.equity, reliability:reliabilityScore(tr,te) };
+    row.score = row.reliability + scoreBacktestResult(te);
+    out.push(row);
+  });
+  out.sort(function(a,b){ if(b.reliability!==a.reliability) return b.reliability-a.reliability; if(b.profit!==a.profit) return b.profit-a.profit; return a.drawdown-b.drawdown; });
+  return {mode:'trainTest', split:split, rows:out};
+}
+function scanWalkForward(seq, params){
+  var seasons=[]; seq.forEach(function(m){ if(seasons.indexOf(m.season)<0) seasons.push(m.season); }); seasons.sort();
+  var folds=[], totalProfit=0, totalStaked=0, combinedEquity=[], totalDD=0;
+  for(var i=1;i<seasons.length;i++){
+    var trainSeasons=seasons.slice(0,i), testSeason=seasons[i];
+    var train=seq.filter(function(m){return trainSeasons.indexOf(m.season)>=0;}), test=seq.filter(function(m){return m.season===testSeason;});
+    var res=scanResearch(train,params).rows;
+    var bestTrain=res[0];
+    var cfg=buildDrawMartingaleStrategy(bestTrain.start,bestTrain.stop,bestTrain.multiplier,bestTrain.base,bestTrain.odds); cfg.id=bestTrain.id;
+    var te=backtestStrategy(test,cfg);
+    totalProfit+=te.profit; totalStaked+=te.totalStaked; totalDD=Math.max(totalDD,te.drawdown);
+    var offset=combinedEquity.length?combinedEquity[combinedEquity.length-1]:0;
+    te.equity.forEach(function(v){ combinedEquity.push(offset+v); });
+    folds.push({trainSeasons:trainSeasons, testSeason:testSeason, chosen:bestTrain, test:te});
+  }
+  var wf={ id:'WALK-FORWARD', start:'משתנה', stop:'משתנה', multiplier:'משתנה', profit:totalProfit, roi:totalStaked?totalProfit/totalStaked:0,
+    totalStaked:totalStaked, drawdown:maxDrawdownFromEquity(combinedEquity), bankrollNeeded:maxDrawdownFromEquity(combinedEquity), equity:combinedEquity, folds:folds };
+  return {mode:'walkForward', seasons:seasons, rows:[wf], folds:folds};
+}
+function scanStrategies(seq, params){
+  var mode=params.validationMode||'trainTest';
+  if(!seq || !seq.length) return {mode:mode, rows:[]};
+  if(mode==='research') return scanResearch(seq,params);
+  if(mode==='walkForward') return scanWalkForward(seq,params);
+  return scanTrainTest(seq,params,params.trainSeasons||3);
+}
+function runAdvancedOptimizer(){
+  if(!(state.team && state.matches.length)){ alert('קודם טען נתונים ובחר קבוצה.'); return; }
+  var stats=teamStats(filteredMatches(), state.team);
+  var params={
+    startMin:Math.max(0,Number(el('advStartMin').value)||0), startMax:Math.max(0,Number(el('advStartMax').value)||0),
+    endMin:Math.max(1,Number(el('advEndMin').value)||1), endMax:Math.max(1,Number(el('advEndMax').value)||1),
+    multMin:Math.max(1,Number(el('advMultMin').value)||1.2), multMax:Math.max(1,Number(el('advMultMax').value)||3), multStep:Math.max(0.01,Number(el('advMultStep').value)||0.2),
+    odds:Math.max(1.1,Number(el('advOdds').value)||3), base:Math.max(1,Number(el('advBase').value)||10),
+    validationMode:el('advValidationMode').value, trainSeasons:Math.max(1,Number(el('advTrainSeasons').value)||3)
+  };
+  if(params.startMax<params.startMin){ var tmp=params.startMin; params.startMin=params.startMax; params.startMax=tmp; }
+  if(params.endMax<params.endMin){ var tmp2=params.endMin; params.endMin=params.endMax; params.endMax=tmp2; }
+  var btn=el('advRunBtn'), out=el('advOut');
+  btn.disabled=true; out.innerHTML='<div class="fmsg ok">⏳ מריץ סריקה עם Reality Guard על '+esc(state.team)+'...</div>';
+  setTimeout(function(){ _advResultsObj=scanStrategies(stats.seq,params); _advResults=_advResultsObj.rows; btn.disabled=false; renderAdvancedResults(_advResultsObj, stats, params); },20);
+}
+function modeGuardHtml(obj){
+  if(obj.mode==='research') return '<div class="guard danger">⚠️ <strong>Research בלבד:</strong> התוצאות נבחרו על כל הנתונים ולכן עלולות להיות מותאמות לעבר. לא להשתמש בזה כהוכחה לאסטרטגיה.</div>';
+  if(obj.mode==='trainTest') return '<div class="guard">🛡️ <strong>Train/Test:</strong> בחירה על '+obj.split.trainSeasons.join(', ')+' · בדיקה נקייה על '+obj.split.testSeasons.join(', ')+'. דירוג לפי ביצועי Test ואמינות.</div>';
+  return '<div class="guard">🛡️ <strong>Walk-Forward:</strong> בכל עונה נבחרת אסטרטגיה רק לפי העונות הקודמות, ואז נבדקת על העונה הבאה.</div>';
+}
+function renderWalkForward(obj, stats, params){
+  var out=el('advOut'), wf=obj.rows[0];
+  var h=modeGuardHtml(obj);
+  h+='<div class="best '+(wf.profit>0?'good':'bad')+'">🚶 Walk-Forward כולל · רווח '+money(wf.profit)+' · ROI '+(wf.roi*100).toFixed(1)+'% · Drawdown '+money(wf.drawdown)+'</div>';
+  h+='<div class="rtable-wrap"><table class="rtable"><tr><th>עונת בדיקה</th><th>עונות אימון</th><th>אסטרטגיה שנבחרה בזמן אמת</th><th>רווח Train</th><th>רווח Test</th><th>ROI Test</th><th>Drawdown</th></tr>';
+  obj.folds.forEach(function(f){ h+='<tr><td>'+esc(f.testSeason)+'</td><td>'+esc(f.trainSeasons.join(', '))+'</td><td class="sea">'+esc(f.chosen.id)+'</td><td>'+money(f.chosen.profit)+'</td><td class="'+(f.test.profit>=0?'ok-c':'hot')+'">'+money(f.test.profit)+'</td><td>'+((f.test.roi||0)*100).toFixed(1)+'%</td><td>'+money(f.test.drawdown)+'</td></tr>'; });
+  h+='</table></div>';
+  h+='<div class="chart-t">גרף רווח מצטבר — Walk-Forward</div><div class="chart">'+svgLine(wf.equity.map(function(v,i){return {x:i,y:v};}),{h:190})+'</div>';
+  h+='<div class="removed-note">כדי למנוע בלבול, הסתרתי בגרסה זו את הסימולטור הישן ואת סורק כל הקבוצות. נשארים עם סטטיסטיקה + אופטימייזר מאומת בלבד.</div>';
+  out.innerHTML=h;
+}
+function renderAdvancedResults(obj, stats, params){
+  var rows=obj.rows||[], out=el('advOut');
+  if(obj.mode==='walkForward') return renderWalkForward(obj,stats,params);
+  if(!rows.length){ out.innerHTML='<div class="fmsg warn">לא נמצאו שילובים חוקיים. ודא שסיום גדול מהתחלה.</div>'; return; }
+  var best=rows[0], profitable=rows.filter(function(r){return r.profit>0;}).length;
+  var seasons=Object.keys(best.perSeason||{}).sort();
+  var title=(obj.mode==='trainTest')?'הטוב ביותר על Test':'הטוב ביותר במחקר';
+  var h=modeGuardHtml(obj);
+  h+='<div class="best '+(best.profit>0?'good':'bad')+'">🏆 '+title+': <strong>'+esc(best.id)+'</strong> · רווח '+money(best.profit)+' · ROI '+(best.roi*100).toFixed(1)+'% · אמינות '+(best.reliability||0)+'/100 · דרודאון '+money(best.drawdown)+'</div>';
+  h+='<div class="kpis">'+
+     '<div class="kpi"><div class="kpi-v">'+fmt(rows.length)+'</div><div class="kpi-l">אסטרטגיות</div></div>'+ 
+     '<div class="kpi accent"><div class="kpi-v">'+fmt(profitable)+'</div><div class="kpi-l">רווחיות במדד הנבדק</div></div>'+ 
+     '<div class="kpi"><div class="kpi-v">'+fmt(stats.seq.length)+'</div><div class="kpi-l">משחקי קבוצה</div></div>'+ 
+     '<div class="kpi warn"><div class="kpi-v">'+money(best.maxStake)+'</div><div class="kpi-l">הימור מקס׳</div></div>'+ 
+     '</div>';
+  h+='<div class="risknote"><strong>הגדרה:</strong> אחרי X משחקים ללא תיקו מהמרים על המשחק הבא. ממשיכים לפי המקדם עד זכייה או עד נקודת הסיום. אם הסדרה נכשלה, מחכים לתיקו הבא לפני פתיחת סדרה חדשה.</div>';
+  h+='<div class="rtable-wrap"><table class="rtable"><tr><th>#</th><th>ID</th><th>התחלה</th><th>סוף</th><th>מקדם</th>';
+  if(obj.mode==='trainTest') h+='<th>Train</th><th>Test</th><th>אמינות</th>';
+  h+='<th>רווח</th><th>ROI</th><th>כניסות</th><th>זכיות</th><th>נכשלו</th><th>הימורים</th><th>הימור מקס׳</th><th>חשיפה מקס׳</th><th>Drawdown</th><th>בנק דרוש</th><th>ציון</th>';
+  seasons.forEach(function(sn){ h+='<th>'+esc(sn)+'</th>'; }); h+='</tr>';
+  rows.slice(0,30).forEach(function(r,i){
+    h+='<tr><td>'+(i+1)+'</td><td class="sea">'+esc(r.id)+'</td><td>'+r.start+'</td><td>'+r.stop+'</td><td>'+Number(r.multiplier).toFixed(2)+'</td>';
+    if(obj.mode==='trainTest') h+='<td class="'+(r.train.profit>=0?'ok-c':'hot')+'">'+money(r.train.profit)+'</td><td class="'+(r.test.profit>=0?'ok-c':'hot')+'">'+money(r.test.profit)+'</td><td>'+r.reliability+'/100</td>';
+    h+='<td class="'+(r.profit>0?'ok-c':'hot')+'">'+money(r.profit)+'</td><td>'+((r.roi||0)*100).toFixed(1)+'%</td><td>'+r.entries+'</td><td>'+r.wins+'</td><td>'+r.failed+'</td><td>'+r.totalBets+'</td><td>'+money(r.maxStake)+'</td><td>'+money(r.maxExposure)+'</td><td>'+money(r.drawdown)+'</td><td>'+money(r.bankrollNeeded)+'</td><td>'+r.score+'</td>';
+    seasons.forEach(function(sn){ var v=r.perSeason[sn]||0; h+='<td class="'+(v>=0?'ok-c':'hot')+'">'+money(v)+'</td>'; }); h+='</tr>';
+  });
+  h+='</table></div>';
+  h+='<div class="chart-t">גרף רווח מצטבר — '+(obj.mode==='trainTest'?'תקופת Test':'כל התקופה')+'</div><div class="chart">'+svgLine(best.equity.map(function(v,i){return {x:i,y:v};}),{h:190})+'</div>';
+  h+='<div class="removed-note">ניקוי למניעת בלבול: הסימולטור הישן, סורק כל הקבוצות והשילובים השמורים מוסתרים בגרסה הזו. הם נטו לגרום לערבוב בין מחקר לבין בדיקה אמיתית.</div>';
+  out.innerHTML=h;
+}
+function exportAdvancedCSV(){
+  var obj=_advResultsObj || {mode:'research', rows:_advResults||[]};
+  if(!obj.rows || !obj.rows.length){ alert('קודם הרץ אופטימיזציה.'); return; }
+  if(obj.mode==='walkForward'){
+    var rows=[['mode','test_season','train_seasons','chosen_id','train_profit','test_profit','test_roi_pct','drawdown','max_stake']].concat(obj.folds.map(function(f){return ['walkForward',f.testSeason,f.trainSeasons.join('|'),f.chosen.id,Math.round(f.chosen.profit*100)/100,Math.round(f.test.profit*100)/100,(f.test.roi*100).toFixed(2),Math.round(f.test.drawdown*100)/100,Math.round(f.test.maxStake*100)/100];}));
+    downloadCSV('drawlab_walk_forward_'+(state.team||'team')+'.csv',rows); return;
+  }
+  var seasons=Object.keys(obj.rows[0].perSeason||{}).sort();
+  var header=['mode','id','start','stop','multiplier','base','odds','train_profit','test_profit','reliability','profit','roi_pct','entries','wins','failed','hit_rate_pct','total_bets','total_staked','max_stake','max_exposure','drawdown','bankroll_needed','max_losing_series','score'].concat(seasons.map(function(s){return 'profit_'+s;}));
+  var data=[header].concat(obj.rows.map(function(r){
+    var row=[obj.mode,r.id,r.start,r.stop,r.multiplier,r.base,r.odds,r.train?Math.round(r.train.profit*100)/100:'',r.test?Math.round(r.test.profit*100)/100:'',r.reliability||'',Math.round(r.profit*100)/100,(r.roi*100).toFixed(2),r.entries,r.wins,r.failed,(r.hitRate*100).toFixed(1),r.totalBets,Math.round(r.totalStaked*100)/100,Math.round(r.maxStake*100)/100,Math.round(r.maxExposure*100)/100,Math.round(r.drawdown*100)/100,Math.round(r.bankrollNeeded*100)/100,r.maxLosingSeries,r.score];
+    seasons.forEach(function(sn){ row.push(Math.round((r.perSeason[sn]||0)*100)/100); });
+    return row;
+  }));
+  downloadCSV('drawlab_reality_guard_'+(state.team||'team')+'.csv',data);
+}
 
 /* ===== קישור אירועים ===== */
 function bind(){

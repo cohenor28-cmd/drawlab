@@ -2,7 +2,7 @@
    גרסה זו מאפשרת עבודה אופליין ומבטיחה שעדכונים מ-Claude יופיעו מיד.
    כל פעם שמעלים גרסה חדשה — יש לשנות את CACHE_NAME (למשל v2, v3...).
 */
-const CACHE_NAME = 'drawlab-ai-backtest-v39';
+const CACHE_NAME = 'drawlab-ai-backtest-v41';
 const ASSETS = [
   './',
   './index.html',
